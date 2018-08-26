@@ -1,8 +1,9 @@
 use scene::Scene;
 use num_traits;
 use cgmath::prelude::*;
-use cgmath::{self, Vector3};
+use cgmath::*;
 use std::cell::RefCell;
+use rand;
 
 type F = f32;
 const PI: F = 3.14;
@@ -30,6 +31,9 @@ impl Ray {
     }
 }
 
+pub fn element_wise_map<Fun: Fn(F) -> F>(vec: &Vector3<F>, f: Fun) -> Vector3<F> {
+    Vector3::new(f(vec.x), f(vec.y), f(vec.z))
+}
 
 pub fn element_wise_division(left: &Vector3<F>, right: &Vector3<F>) -> Vector3<F> {
     Vector3::new(left.x / right.x, left.y / right.y, left.z / right.z)
@@ -59,12 +63,12 @@ impl<'a> Raytracer<'a> {
             for x in 0..self.width {
                 let ray = self.generate_primary_ray(x, y);
 
-                self.image[x + y * self.width] = self.trace(&ray);
+                self.image[x + y * self.width] = self.trace(&ray, 2);
             }
         }
     }
 
-    fn trace(&mut self, ray: &Ray) -> Vector3<F> {
+    fn trace(&mut self, ray: &Ray, bounces: usize) -> Vector3<F> {
         let mut closest: (F, usize, Hit) = (123125.0, 12958125, Hit::default());
 
         for (i, object) in self.scene.borrow().objects.iter().enumerate() {
@@ -81,29 +85,80 @@ impl<'a> Raytracer<'a> {
 
         if closest.1 == 12958125 { return Vector3::new(0.0, 0.0, 0.0) };
         
-        println!("HIT!");
-
         let scene = self.scene.borrow();
         let object = &scene.objects[closest.1];
         let hit = closest.2;
 
         let mut total = Vector3::new(0.0, 0.0, 0.0);
         
-        for light in scene.lights.iter() {
+        // Direct lighting
+        'light_iter: for light in scene.lights.iter() {
+            // Shadow
+            for (index, shadow_object) in scene.objects.iter().enumerate() {
+                if closest.1 == index { continue; }
+                let shadow_hit = shadow_object.check_ray(&Ray { origin: light.position, direction: (hit.position - light.position).normalize() });
+                if let Some(shadow_hit) = shadow_hit {
+                    if shadow_hit.position.distance(light.position) < light.position.distance(hit.position) {
+                        continue 'light_iter;
+                    }
+                }
+            }
+
+            let distance = light.position.distance(hit.position);
+            let attenuation = 1.0 / (distance * distance);
             let cos_theta = hit.normal.dot((light.position - hit.position).normalize()).max(0.0);
             
-            total += light.intensity.mul_element_wise(object.get_material().color) * cos_theta;
+            total += light.intensity * cos_theta * attenuation;
         }
 
-        return total;
+        if bounces == 0 { return total.mul_element_wise(object.get_material().color) / PI; }
+
+        // Indirect lighting
+        const N: usize = 4;
+
+        let mut total_indirect = Vector3::new(0.0, 0.0, 0.0);
+        let local_cartesian = self.create_coordinate_system_of_n(hit.normal);
+        let local_cartesian_transform = Matrix3::from_cols(local_cartesian.0, hit.normal, local_cartesian.1);
+        for i in 0..N {
+            let sample = self.uniform_sample_hemisphere();
+            let sample_world = local_cartesian_transform * sample;
+
+            total_indirect += sample_world.dot(hit.normal).max(0.0) * self.trace(&Ray { origin: hit.position, direction: sample_world }, bounces - 1);
+        }
+        total_indirect /= N as F * (1.0 / (2.0 * PI));
+
+        return (total + total_indirect).mul_element_wise(object.get_material().color) / PI;
     }
+
+    fn uniform_sample_hemisphere(&self) -> Vector3<F> {
+        let r1 = rand::random::<F>();
+        let r2 = rand::random::<F>();
+
+        let sin_theta = (1.0 - r1 * r1).sqrt();
+        let phi = 2.0 * PI * r2;
+        let x = sin_theta * phi.cos();
+        let z = sin_theta * phi.sin();
+        return Vector3::new(x, r1, z);
+    }
+    
+    fn create_coordinate_system_of_n(&self, n: Vector3<F>) -> (Vector3<F>, Vector3<F>) {
+        let nt = Vector3::new(n.z, 0.0, -n.x).normalize();
+        let nb = n.cross(nt);
+
+        return (nt, nb);
+    }
+    
 
     // Exports the internal HDR format to RGB for saving or display
     pub fn export_image(&self) -> Vec<Vector3<u8>> {
         let mut export: Vec<Vector3<u8>> = vec!(Vector3::new(0, 0, 0); (self.width * self.height) as usize);
 
         for (i, p) in self.image.iter().enumerate() {
-            let tone_mapped = element_wise_division(p , &(p + Vector3::new(1.0, 1.0, 1.0)));
+            // let tone_mapped = element_wise_division(p , &(p + Vector3::new(1.0, 1.0, 1.0)));
+            let exposure = 1.0;
+            let gamma = 2.2;
+            let tone_mapped = Vector3::new(1.0, 1.0, 1.0) - element_wise_map(&(p * -1.0 * exposure), |e| F::exp(e));
+            let tone_mapped = element_wise_map(&tone_mapped, |x| x.powf(1.0 / gamma));
             export[i] = (tone_mapped * 255.0).cast().unwrap();
         }
 
@@ -118,6 +173,6 @@ impl<'a> Raytracer<'a> {
         let px = (2.0 * ((x + 0.5) / width) - 1.0) * F::tan(self.fov / 2.0 * PI / 180.0) * aspect;
         let py = (1.0 - 2.0 * ((y + 0.5) / height)) * F::tan(self.fov / 2.0 * PI / 180.0);
 
-        Ray::new(Vector3::new(0.0, 0.0, 0.0), Vector3::new(px, py, -1.0).normalize())
+        Ray::new(Vector3::new(0.0, 0.0, 0.0), Vector3::new(px, py, 1.0).normalize())
     }
 }

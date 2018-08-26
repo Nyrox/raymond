@@ -7,3 +7,4 @@ authors = ["Nyrox <root@nyrox.tech>"]
 cgmath="*"
 image="*"
 num-traits="*"
+rand="*"
