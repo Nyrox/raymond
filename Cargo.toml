@@ -1,0 +1,9 @@
+[package]
+name = "raytracer-rs"
+version = "0.1.0"
+authors = ["Nyrox <root@nyrox.tech>"]
+
+[dependencies]
+cgmath="*"
+image="*"
+num-traits="*"
