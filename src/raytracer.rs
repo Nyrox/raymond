@@ -118,6 +118,6 @@ impl<'a> Raytracer<'a> {
         let px = (2.0 * ((x + 0.5) / width) - 1.0) * F::tan(self.fov / 2.0 * PI / 180.0) * aspect;
         let py = (1.0 - 2.0 * ((y + 0.5) / height)) * F::tan(self.fov / 2.0 * PI / 180.0);
 
-        Ray::new(Vector3::new(0.0, 0.0, 0.0), Vector3::new(px, py, -1.0))
+        Ray::new(Vector3::new(0.0, 0.0, 0.0), Vector3::new(px, py, -1.0).normalize())
     }
 }
