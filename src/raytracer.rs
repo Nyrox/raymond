@@ -1,12 +1,15 @@
-use scene::Scene;
+use scene::*;
 use num_traits;
 use cgmath::prelude::*;
 use cgmath::*;
 use std::cell::RefCell;
 use rand;
 
+use std::sync::atomic::Ordering;
+use std::time::{Duration, Instant};
+
 type F = f32;
-const PI: F = 3.14;
+const PI: F = 3.141592;
 
 pub struct Ray {
     pub origin: Vector3<F>,
@@ -63,12 +66,16 @@ impl<'a> Raytracer<'a> {
             for x in 0..self.width {
                 let ray = self.generate_primary_ray(x, y);
 
-                self.image[x + y * self.width] = self.trace(&ray, 2);
+                self.image[x + y * self.width] = self.trace(&ray, Vector3::new(0.0, 0.0, 0.0), 3).1;
             }
+
+            println!("Finished line: {} of {}", y, self.height);
         }
     }
 
-    fn trace(&mut self, ray: &Ray, bounces: usize) -> Vector3<F> {
+    fn trace(&mut self, ray: &Ray, camera_pos: Vector3<F>, bounces: usize) -> (F, Vector3<F>) {
+        super::TRACE_COUNT.fetch_add(1, Ordering::Relaxed);
+
         let mut closest: (F, usize, Hit) = (123125.0, 12958125, Hit::default());
 
         for (i, object) in self.scene.borrow().objects.iter().enumerate() {
@@ -83,7 +90,7 @@ impl<'a> Raytracer<'a> {
             }
         }
 
-        if closest.1 == 12958125 { return Vector3::new(0.0, 0.0, 0.0) };
+        if closest.1 == 12958125 { return (0.001, Vector3::new(0.0, 0.0, 0.0)) };
         
         let scene = self.scene.borrow();
         let object = &scene.objects[closest.1];
@@ -91,11 +98,25 @@ impl<'a> Raytracer<'a> {
 
         let mut total = Vector3::new(0.0, 0.0, 0.0);
         
+        match object.get_material() {
+            Material::Emission(intensity) => { return (closest.0, intensity); },
+            _ => {}
+        }
+        let (material_color, material_roughness, material_metalness) = match object.get_material() {
+            Material::Diffuse(color, roughness) => (color, roughness, 0.0),
+            Material::Metal(color, roughness) => (color, roughness, 1.0),
+            _ => panic!()
+        };
+
         // Direct lighting
         'light_iter: for light in scene.lights.iter() {
             // Shadow
+            let now = Instant::now();
+
             for (index, shadow_object) in scene.objects.iter().enumerate() {
                 if closest.1 == index { continue; }
+                super::SHADOW_RAY_COUNT.fetch_add(1, Ordering::Relaxed);
+
                 let shadow_hit = shadow_object.check_ray(&Ray { origin: light.position, direction: (hit.position - light.position).normalize() });
                 if let Some(shadow_hit) = shadow_hit {
                     if shadow_hit.position.distance(light.position) < light.position.distance(hit.position) {
@@ -104,6 +125,8 @@ impl<'a> Raytracer<'a> {
                 }
             }
 
+            super::SHADOW_TOTAL_TIME.fetch_add((Instant::now() - now).as_nanos() as usize, Ordering::Relaxed);
+
             let distance = light.position.distance(hit.position);
             let attenuation = 1.0 / (distance * distance);
             let cos_theta = hit.normal.dot((light.position - hit.position).normalize()).max(0.0);
@@ -111,23 +134,88 @@ impl<'a> Raytracer<'a> {
             total += light.intensity * cos_theta * attenuation;
         }
 
-        if bounces == 0 { return total.mul_element_wise(object.get_material().color) / PI; }
+        if bounces == 0 { return (closest.0, total.mul_element_wise(material_color)); }
 
         // Indirect lighting
-        const N: usize = 4;
+        const N: usize = 8;
 
         let mut total_indirect = Vector3::new(0.0, 0.0, 0.0);
         let local_cartesian = self.create_coordinate_system_of_n(hit.normal);
         let local_cartesian_transform = Matrix3::from_cols(local_cartesian.0, hit.normal, local_cartesian.1);
+        
+        let view_dir = (camera_pos - hit.position).normalize();
+        let f0 = Vector3::new(0.04, 0.04, 0.04);
+        let f0 = Self::lerp_vec(f0, material_color, material_metalness);
+
         for i in 0..N {
             let sample = self.uniform_sample_hemisphere();
-            let sample_world = local_cartesian_transform * sample;
+            let sample_world = (local_cartesian_transform * sample).normalize();
 
-            total_indirect += sample_world.dot(hit.normal).max(0.0) * self.trace(&Ray { origin: hit.position, direction: sample_world }, bounces - 1);
+            let incoming = self.trace(&Ray { origin: hit.position + sample_world * 0.001, direction: sample_world }, hit.position, bounces - 1);
+
+            let incoming_radiance = incoming.1;
+            let distance = incoming.0;
+            let cos_theta = hit.normal.dot(sample_world).max(0.0);
+            let attenuation = 1.0 / (distance * distance);
+            let radiance = incoming_radiance * attenuation;
+
+            let light_dir = sample_world.normalize();
+            let halfway = (light_dir + view_dir).normalize();
+
+            let fresnel = Self::fresnel_schlick(halfway.dot(view_dir).max(0.0), f0);
+
+            let specular_part = fresnel;
+            let mut diffuse_part = Vector3::new(1.0, 1.0, 1.0) - specular_part;
+
+            diffuse_part *= 1.0 - material_metalness;
+
+            let D = Self::ggx_distribution(hit.normal, halfway, material_roughness);
+            let G = Self::geometry_smith(hit.normal, view_dir, sample_world, material_roughness);
+
+            let nominator = D * G * fresnel;
+            let denominator = 4.0 * hit.normal.dot(view_dir).max(0.0) * cos_theta + 0.001;
+            let specular = nominator / denominator;
+
+            let output = (diffuse_part.mul_element_wise(material_color) / PI + specular).mul_element_wise(radiance) * cos_theta;
+
+            total_indirect += radiance / 10.0;
         }
         total_indirect /= N as F * (1.0 / (2.0 * PI));
 
-        return (total + total_indirect).mul_element_wise(object.get_material().color) / PI;
+        return (closest.0, (total + total_indirect));
+    }
+
+    fn ggx_distribution(n: Vector3<F>, h: Vector3<F>, roughness: F) -> F {
+        let nominator = roughness.powf(2.0);
+        let denominator = n.dot(h).max(0.0).powf(2.0) * (roughness.powf(2.0) - 1.0) + 1.0;
+        let denominator = PI * denominator * denominator;
+        return nominator / denominator;
+    }
+
+    fn geometry_schlick_ggx(n: Vector3<F>, v: Vector3<F>, k: F) -> F {
+        let n_dot_v = n.dot(v).max(0.0);
+        let k = (k*k) / 8.0;
+
+        let nominator = n_dot_v;
+        let denominator = n_dot_v * (1.0 - k) + k;
+
+        return nominator / denominator;
+    }
+
+    fn geometry_smith(n: Vector3<F>, v: Vector3<F>, l: Vector3<F>, k: F) -> F {
+        return Self::geometry_schlick_ggx(n, v, k) * Self::geometry_schlick_ggx(n, l, k);
+    }
+
+    fn fresnel_schlick(cos_theta: F, F0: Vector3<F>) -> Vector3<F> {
+        return F0 + (Vector3::new(1.0, 1.0, 1.0) - F0) * (1.0 - cos_theta).powf(5.0);
+    }
+
+    fn lerp_vec(min: Vector3<F>, max: Vector3<F>, a: F) -> Vector3<F> {
+        Vector3::new(Self::lerp(min.x, max.x, a), Self::lerp(min.y, max.y, a), Self::lerp(min.z, max.z, a))
+    }
+
+    fn lerp(min: F, max: F, a: F) -> F {
+        min + a * (max - min)
     }
 
     fn uniform_sample_hemisphere(&self) -> Vector3<F> {
@@ -142,7 +230,13 @@ impl<'a> Raytracer<'a> {
     }
     
     fn create_coordinate_system_of_n(&self, n: Vector3<F>) -> (Vector3<F>, Vector3<F>) {
-        let nt = Vector3::new(n.z, 0.0, -n.x).normalize();
+        let mut nt;
+        if n.x.abs() > n.y.abs() {
+            nt = Vector3::new(n.z, 0.0, -n.x).normalize();
+        }
+        else {
+            nt = Vector3::new(0.0, -n.z, n.y).normalize();
+        }
         let nb = n.cross(nt);
 
         return (nt, nb);
@@ -159,7 +253,18 @@ impl<'a> Raytracer<'a> {
             let gamma = 2.2;
             let tone_mapped = Vector3::new(1.0, 1.0, 1.0) - element_wise_map(&(p * -1.0 * exposure), |e| F::exp(e));
             let tone_mapped = element_wise_map(&tone_mapped, |x| x.powf(1.0 / gamma));
-            export[i] = (tone_mapped * 255.0).cast().unwrap();
+
+            for i in 0..3 {
+                let e = tone_mapped[i];
+                if e > 1.0 || e < 0.0 {
+                    println!("Problem: {:?}", e);
+                }
+            }
+            
+            match (tone_mapped * 255.0).cast() {
+                Some(v) => { export[i] = v; },
+                None => { println!("PROBLEM: {:?}", tone_mapped * 255.0) }
+            };
         }
 
         return export;

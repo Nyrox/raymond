@@ -1,13 +1,14 @@
 use cgmath::Vector3;
 use cgmath::prelude::*;
 use raytracer::{Ray, Hit};
+
 type F = f32;
 
-
-
 #[derive(Debug, Clone)]
-pub struct Material {
-    pub color: Vector3<F>,
+pub enum Material {
+    Diffuse(Vector3<F>, F),
+    Metal(Vector3<F>, F),
+    Emission(Vector3<F>),
 }
 
 pub trait Object {
