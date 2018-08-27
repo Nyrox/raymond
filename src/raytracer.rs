@@ -59,8 +59,8 @@ pub struct Raytracer {
     pub scene: Arc<RwLock<Scene>>,
 }
 
-unsafe impl<'a> marker::Send for Raytracer {}
-unsafe impl<'a> marker::Sync for Raytracer {}
+unsafe impl marker::Send for Raytracer {}
+unsafe impl marker::Sync for Raytracer {}
 
 impl Raytracer {
     pub fn new(width: usize, height: usize, fov: F, scene: Arc<RwLock<Scene>>) -> Raytracer {
@@ -73,38 +73,23 @@ impl Raytracer {
     }
 
     pub fn render(&mut self) {
-        let mut lines = Arc::new(Mutex::new(Vec::new()));
         let mut thread_handles = Vec::new();
         const THREAD_COUNT: usize = 4;
 
-        for y in 0..self.height { lines.lock().unwrap().push(y); }
-
         let raytracer = Arc::new(self);
-        let lines = Arc::new(lines);
         for i in 0..THREAD_COUNT {
-            let lines = lines.clone();
             let raytracer = raytracer.clone();
             unsafe {
-            thread_handles.push(crossbeam_utils::thread::spawn_unchecked(move || {
-                loop {
-                    let line; 
-                    {
-                        line = lines.lock().unwrap().pop();
-                    }
-                    if let Some(line) = line {
+                thread_handles.push(crossbeam_utils::thread::spawn_unchecked(move || {
+                    let start = raytracer.height / THREAD_COUNT * i;
+                    for y in start..(start + raytracer.height / THREAD_COUNT) {
                         for x in 0..raytracer.width {
-                            let ray = raytracer.generate_primary_ray(x, line);
-                            let result = raytracer.trace(&ray, Vector3::new(0.0, 0.0, 0.0), 2).1;
-                            raytracer.image.write().unwrap()[x + line * raytracer.width] = result;
+                                let ray = raytracer.generate_primary_ray(x, y);
+                                let result = raytracer.trace(&ray, Vector3::new(0.0, 0.0, 0.0), 2).1;
+                                raytracer.image.write().unwrap()[x + y * raytracer.width] = result;
                         }
-
-                        println!("Finished line: {} out of: {}", LINE_COUNT.fetch_add(1, Ordering::Relaxed), raytracer.height);
                     }
-                    else {
-                        return;
-                    }
-                }
-            }));
+                }));
             }
         }
 
@@ -115,7 +100,7 @@ impl Raytracer {
     }
 
     fn trace(&self, ray: &Ray, camera_pos: Vector3<F>, bounces: usize) -> (F, Vector3<F>) {
-        super::TRACE_COUNT.fetch_add(1, Ordering::Relaxed);
+        // super::TRACE_COUNT.fetch_add(1, Ordering::Relaxed);
 
         let mut closest: (F, usize, Hit) = (123125.0, 12958125, Hit::default());
 
@@ -197,7 +182,7 @@ impl Raytracer {
             let incoming_radiance = incoming.1;
             let distance = incoming.0;
             let cos_theta = hit.normal.dot(sample_world).max(0.0);
-            let attenuation = 1.0 / (distance * distance);
+            let attenuation = 1.0;
             let radiance = incoming_radiance * attenuation;
 
             let light_dir = sample_world.normalize();
