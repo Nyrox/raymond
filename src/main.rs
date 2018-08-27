@@ -5,6 +5,7 @@ extern crate num_traits;
 extern crate cgmath;
 extern crate image;
 extern crate rand;
+extern crate crossbeam_utils;
 
 pub mod raytracer;
 pub mod scene;
@@ -15,6 +16,8 @@ use std::cell::RefCell;
 
 use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT, Ordering};
 use std::time::{Duration, Instant};
+use std::sync::RwLock;
+use std::sync::Arc;
 
 static TRACE_COUNT: AtomicUsize = ATOMIC_USIZE_INIT;
 static SHADOW_RAY_COUNT: AtomicUsize = ATOMIC_USIZE_INIT;
@@ -61,9 +64,8 @@ fn main() {
     // scene.lights.push(Light { position: Vector3::new(0.0, 1.95, 2.5), intensity: Vector3::new(0.8, 0.8, 1.0) });
     // scene.lights.push(Light { position: Vector3::new(1.75, -0.75, 1.0), intensity: Vector3::new(0.8, 1.0, 0.7) });
 
-    let mut scene = RefCell::new(scene);
-    let mut raytracer = Raytracer::new(WIDTH, HEIGHT, 75.0, &scene);
-    println!("{}", raytracer.image.len());
+    let mut scene = Arc::new(RwLock::new(scene));
+    let mut raytracer = Raytracer::new(WIDTH, HEIGHT, 75.0, scene);
     raytracer.render();
 
     println!("Finished render.\nTotal render time: {}s\nTotal amount of trace calls: {}\nTotal amount of shadow rays cast: {}\n", 
