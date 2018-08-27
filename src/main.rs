@@ -28,13 +28,13 @@ fn main() {
 
     let mut scene = Scene::new();
     scene.objects.push(Box::new(Sphere { origin: Vector3::new(1.0, -0.5, 2.5), radius: 0.5, material: Material::Diffuse(
-        Vector3::new(1.0, 0.00, 0.00), 0.3
+        Vector3::new(1.0, 0.00, 0.00), 0.6
     )}));
     scene.objects.push(Box::new(Sphere { origin: Vector3::new(-1.25, -0.25, 3.5), radius: 0.75, material: Material::Metal(
-        Vector3::new(0.0, 0.25, 1.00), 0.1
+        Vector3::new(0.0, 0.25, 1.00), 0.05
     )}));
-    scene.objects.push(Box::new(Sphere { origin: Vector3::new(-0.1, -0.65, 2.2), radius: 0.35, material: Material::Emission(
-        Vector3::new(1.0, 1.00, 1.00),
+    scene.objects.push(Box::new(Sphere { origin: Vector3::new(-0.1, -0.65, 2.2), radius: 0.35, material: Material::Metal(
+        Vector3::new(1.0, 1.0, 0.0), 0.1,
     )}));
 
     // // Floor
@@ -42,8 +42,8 @@ fn main() {
         Vector3::new(0.75, 0.75, 0.75), 0.5
     )}));
     // Ceiling
-    scene.objects.push(Box::new(Plane { origin: Vector3::new(0.0, 2.0, 0.0), normal: Vector3::new(0.0, -1.0, 0.0), material: Material::Diffuse(
-        Vector3::new(1.5, 2.0, 1.5), 0.5
+    scene.objects.push(Box::new(Plane { origin: Vector3::new(0.0, 2.0, 0.0), normal: Vector3::new(0.0, -1.0, 0.0), material: Material::Emission(
+        Vector3::new(0.9, 0.9, 0.9),
     )}));
     // Backwall
     scene.objects.push(Box::new(Plane { origin: Vector3::new(0.0, 0.0, 5.0), normal: Vector3::new(0.0, 0.0, -1.0), material: Material::Diffuse(

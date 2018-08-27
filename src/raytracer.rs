@@ -66,7 +66,7 @@ impl<'a> Raytracer<'a> {
             for x in 0..self.width {
                 let ray = self.generate_primary_ray(x, y);
 
-                self.image[x + y * self.width] = self.trace(&ray, Vector3::new(0.0, 0.0, 0.0), 3).1;
+                self.image[x + y * self.width] = self.trace(&ray, Vector3::new(0.0, 0.0, 0.0), 2).1;
             }
 
             println!("Finished line: {} of {}", y, self.height);
@@ -137,7 +137,7 @@ impl<'a> Raytracer<'a> {
         if bounces == 0 { return (closest.0, total.mul_element_wise(material_color)); }
 
         // Indirect lighting
-        const N: usize = 8;
+        const N: usize = 64;
 
         let mut total_indirect = Vector3::new(0.0, 0.0, 0.0);
         let local_cartesian = self.create_coordinate_system_of_n(hit.normal);
@@ -156,7 +156,7 @@ impl<'a> Raytracer<'a> {
             let incoming_radiance = incoming.1;
             let distance = incoming.0;
             let cos_theta = hit.normal.dot(sample_world).max(0.0);
-            let attenuation = 1.0 / (distance * distance);
+            let attenuation = 1.0;
             let radiance = incoming_radiance * attenuation;
 
             let light_dir = sample_world.normalize();
@@ -178,7 +178,7 @@ impl<'a> Raytracer<'a> {
 
             let output = (diffuse_part.mul_element_wise(material_color) / PI + specular).mul_element_wise(radiance) * cos_theta;
 
-            total_indirect += radiance / 10.0;
+            total_indirect += output;
         }
         total_indirect /= N as F * (1.0 / (2.0 * PI));
 
