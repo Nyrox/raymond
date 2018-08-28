@@ -6,6 +6,7 @@ extern crate cgmath;
 extern crate image;
 extern crate rand;
 extern crate crossbeam_utils;
+extern crate num_cpus;
 
 pub mod raytracer;
 pub mod scene;
@@ -64,8 +65,13 @@ fn main() {
     // scene.lights.push(Light { position: Vector3::new(0.0, 1.95, 2.5), intensity: Vector3::new(0.8, 0.8, 1.0) });
     // scene.lights.push(Light { position: Vector3::new(1.75, -0.75, 1.0), intensity: Vector3::new(0.8, 1.0, 0.7) });
 
-    let mut raytracer = Raytracer::new(WIDTH, HEIGHT, 75.0, scene.clone());
-    raytracer.render();
+    let final_image: Vec<[u8; 3]> = raytracer::build()
+        .with_canvas(600, 400)
+        .with_camera_fov(75.0)
+        .with_bounces(2)
+        .with_samples(64)
+        .with_workers(None)
+        .launch(scene.clone()).into_iter().map(|p| p.into()).collect();
 
     println!("Finished render.\nTotal render time: {}s\nTotal amount of trace calls: {}\nTotal amount of shadow rays cast: {}\n", 
         (Instant::now() - now).as_millis() as f32 / 1000.0,
@@ -73,10 +79,9 @@ fn main() {
         SHADOW_RAY_COUNT.load(Ordering::Relaxed),
     );
     println!("Total time spent on shadow rays: {}s", SHADOW_TOTAL_TIME.load(Ordering::Relaxed) as f32 / 1000.0 / 1000.0 / 1000.0);
-
-    let rgb: Vec<[u8; 3]> = raytracer.export_image().into_iter().map(|p| p.into()).collect();
+    
     let image: image::ImageBuffer<image::Rgb<u8>, Vec<u8>> = image::ImageBuffer::from_fn(WIDTH as u32, HEIGHT as u32, |x, y| {
-        image::Rgb(rgb[(x + y * WIDTH as u32) as usize])
+        image::Rgb(final_image[(x + y * WIDTH as u32) as usize])
     });
     image.save("output.png").expect("Failed to save buffer to disk");
 }

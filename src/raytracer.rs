@@ -20,6 +20,132 @@ static LINE_COUNT: AtomicUsize = ATOMIC_USIZE_INIT;
 type F = f32;
 const PI: F = 3.141592;
 
+
+pub fn build() -> RaytracerBuilder {
+    RaytracerBuilder::new()
+}
+
+#[derive(Clone, Debug)]
+pub struct RaytracerConfig {
+    pub num_workers: usize,
+    pub num_bounces: usize,
+    pub num_samples: usize,
+    pub width: usize,
+    pub height: usize,
+    pub fov: F,
+}
+
+use num_cpus;
+impl RaytracerConfig {
+    pub fn new() -> Self {
+        RaytracerConfig {
+            num_workers: num_cpus::get(),
+            num_bounces: 2,
+            num_samples: 16,
+            width: 0,
+            height: 0,
+            fov: 65.0,
+        }
+    }
+}
+
+pub struct RaytracerBuilder {
+    pub config: RaytracerConfig,
+}
+
+impl RaytracerBuilder {
+    pub fn new() -> Self {
+        RaytracerBuilder { 
+            config: RaytracerConfig::new(),
+        }
+    }
+
+    pub fn with_workers(mut self, t: Option<usize>) -> Self {
+        self.config.num_workers = match t {
+            Some(t) => t,
+            None => num_cpus::get(),
+        };
+        return self;
+    }
+
+    pub fn with_bounces(mut self, b: usize) -> Self {
+        self.config.num_bounces = b;
+        return self;
+    }
+
+    pub fn with_samples(mut self, s: usize) -> Self {
+        self.config.num_samples = s;
+        return self;
+    }
+
+    pub fn with_canvas(mut self, width: usize, height: usize) -> Self {
+        self.config.width = width;
+        self.config.height = height;
+        return self;
+    }
+
+    pub fn with_camera_fov(mut self, fov: F) -> Self {
+        self.config.fov = fov;
+        return self;
+    } 
+
+    pub fn launch(self, scene: Scene) -> Vec<Vector3<u8>> {
+        let mut thread_handles = Vec::new();
+        let THREAD_COUNT = self.config.num_workers;
+
+        let image = RwLock::new(vec![Vector3::new(0.0, 0.0, 0.0); self.config.width * self.config.height]);
+
+        for i in 0..THREAD_COUNT {
+            let raytracer = Raytracer { 
+                config: self.config.clone(),
+                scene: scene.clone(),
+                image: &image,
+            };
+            unsafe {
+                thread_handles.push(crossbeam_utils::thread::spawn_unchecked(move || {
+                    let start = raytracer.config.height / THREAD_COUNT * i;
+                    for y in start..(start + raytracer.config.height / THREAD_COUNT) {
+                        for x in 0..raytracer.config.width {
+                            let ray = raytracer.generate_primary_ray(x, y);
+                            let result = raytracer.trace(&ray, Vector3::new(0.0, 0.0, 0.0), 2).1;
+                            raytracer.image.write().unwrap()[x + y * raytracer.config.width] = result;
+                        }
+
+                        println!("Finished line {} of {}", y, raytracer.config.height);
+                    }
+                }));
+            }
+        }
+
+        for h in thread_handles {
+            h.join().unwrap();
+        }
+
+        let mut export = vec![Vector3::new(0, 0, 0); self.config.width * self.config.height];
+        for (i, p) in image.into_inner().unwrap().iter().enumerate() {
+            // let tone_mapped = element_wise_division(p , &(p + Vector3::new(1.0, 1.0, 1.0)));
+            let exposure = 1.0;
+            let gamma = 2.2;
+            let tone_mapped = Vector3::new(1.0, 1.0, 1.0) - element_wise_map(&(p * -1.0 * exposure), |e| F::exp(e));
+            let tone_mapped = element_wise_map(&tone_mapped, |x| x.powf(1.0 / gamma));
+
+            for i in 0..3 {
+                let e = tone_mapped[i];
+                if e > 1.0 || e < 0.0 {
+                    println!("Problem: {:?}", e);
+                }
+            }
+            
+            match (tone_mapped * 255.0).cast() {
+                Some(v) => { export[i] = v; },
+                None => { println!("PROBLEM: {:?}", tone_mapped * 255.0) }
+            };
+        }
+
+        return export;
+    }
+}
+
 pub struct Ray {
     pub origin: Vector3<F>,
     pub direction: Vector3<F>,
@@ -36,7 +162,6 @@ impl Default for Hit {
         Hit { position: Vector3::new(0.0, 0.0, 0.0), normal: Vector3::new(0.0, 0.0, 0.0) }
     }
 }
-
 impl Ray {
     pub fn new (origin: Vector3<F>, direction: Vector3<F>) -> Ray {
         Ray { origin, direction }
@@ -52,55 +177,16 @@ pub fn element_wise_division(left: &Vector3<F>, right: &Vector3<F>) -> Vector3<F
 }
 
 #[derive(Clone)]
-pub struct Raytracer {
-    pub image: Arc<RwLock<Vec<Vector3<F>>>>,
-    pub width: usize,
-    pub height: usize,
-    pub fov: F,
+pub struct Raytracer<'a> {
+    pub image: &'a RwLock<Vec<Vector3<F>>>,
+    pub config: RaytracerConfig,
     pub scene: Scene,
 }
 
-unsafe impl<'a> marker::Send for Raytracer {}
-unsafe impl<'a> marker::Sync for Raytracer {}
+unsafe impl<'a> marker::Send for Raytracer<'a> {}
+unsafe impl<'a> marker::Sync for Raytracer<'a> {}
 
-impl Raytracer {
-    pub fn new(width: usize, height: usize, fov: F, scene: Scene) -> Raytracer {
-        Raytracer {
-            image: Arc::new(RwLock::new(vec!(Vector3::new(0.0, 0.0, 0.0); (width * height) as usize))),
-            width, height,
-            fov,
-            scene
-        }
-    }
-
-    pub fn render(&mut self) {
-        let mut thread_handles = Vec::new();
-        const THREAD_COUNT: usize = 4;
-
-        for i in 0..THREAD_COUNT {
-            let raytracer = self.clone();
-            unsafe {
-                thread_handles.push(crossbeam_utils::thread::spawn_unchecked(move || {
-                    let start = raytracer.height / THREAD_COUNT * i;
-                    for y in start..(start + raytracer.height / THREAD_COUNT) {
-                        for x in 0..raytracer.width {
-                            let ray = raytracer.generate_primary_ray(x, y);
-                            let result = raytracer.trace(&ray, Vector3::new(0.0, 0.0, 0.0), 2).1;
-                            raytracer.image.write().unwrap()[x + y * raytracer.width] = result;
-                        }
-
-                        println!("Finished line {} of {}", y, raytracer.height);
-                    }
-                }));
-            }
-        }
-
-        for h in thread_handles {
-            h.join().unwrap();
-        }
-
-    }
-
+impl<'a> Raytracer<'a> {
     fn trace(&self, ray: &Ray, camera_pos: Vector3<F>, bounces: usize) -> (F, Vector3<F>) {
         // super::TRACE_COUNT.fetch_add(1, Ordering::Relaxed);
 
@@ -165,7 +251,7 @@ impl Raytracer {
         if bounces == 0 { return (closest.0, total.mul_element_wise(*material_color)); }
 
         // Indirect lighting
-        const N: usize = 96;
+        let N = self.config.num_samples;
 
         let mut total_indirect = Vector3::new(0.0, 0.0, 0.0);
         let local_cartesian = self.create_coordinate_system_of_n(hit.normal);
@@ -269,42 +355,14 @@ impl Raytracer {
 
         return (nt, nb);
     }
-    
-
-    // Exports the internal HDR format to RGB for saving or display
-    pub fn export_image(&self) -> Vec<Vector3<u8>> {
-        let mut export: Vec<Vector3<u8>> = vec!(Vector3::new(0, 0, 0); (self.width * self.height) as usize);
-
-        for (i, p) in self.image.read().unwrap().iter().enumerate() {
-            // let tone_mapped = element_wise_division(p , &(p + Vector3::new(1.0, 1.0, 1.0)));
-            let exposure = 1.0;
-            let gamma = 2.2;
-            let tone_mapped = Vector3::new(1.0, 1.0, 1.0) - element_wise_map(&(p * -1.0 * exposure), |e| F::exp(e));
-            let tone_mapped = element_wise_map(&tone_mapped, |x| x.powf(1.0 / gamma));
-
-            for i in 0..3 {
-                let e = tone_mapped[i];
-                if e > 1.0 || e < 0.0 {
-                    println!("Problem: {:?}", e);
-                }
-            }
-            
-            match (tone_mapped * 255.0).cast() {
-                Some(v) => { export[i] = v; },
-                None => { println!("PROBLEM: {:?}", tone_mapped * 255.0) }
-            };
-        }
-
-        return export;
-    }
 
     fn generate_primary_ray(&self, x: usize, y: usize) -> Ray {
-        let width = self.width as f32; let height = self.height as f32;
+        let width = self.config.width as f32; let height = self.config.height as f32;
         let x = x as f32; let y = y as f32;
         let aspect = width / height;
 
-        let px = (2.0 * ((x + 0.5) / width) - 1.0) * F::tan(self.fov / 2.0 * PI / 180.0) * aspect;
-        let py = (1.0 - 2.0 * ((y + 0.5) / height)) * F::tan(self.fov / 2.0 * PI / 180.0);
+        let px = (2.0 * ((x + 0.5) / width) - 1.0) * F::tan(self.config.fov / 2.0 * PI / 180.0) * aspect;
+        let py = (1.0 - 2.0 * ((y + 0.5) / height)) * F::tan(self.config.fov / 2.0 * PI / 180.0);
 
         Ray::new(Vector3::new(0.0, 0.0, 0.0), Vector3::new(px, py, 1.0).normalize())
     }
