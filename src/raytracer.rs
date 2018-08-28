@@ -51,19 +51,19 @@ pub fn element_wise_division(left: &Vector3<F>, right: &Vector3<F>) -> Vector3<F
     Vector3::new(left.x / right.x, left.y / right.y, left.z / right.z)
 }
 
-pub struct Raytracer {
+pub struct Raytracer<'a> {
     pub image: RwLock<Vec<Vector3<F>>>,
     pub width: usize,
     pub height: usize,
     pub fov: F,
-    pub scene: Arc<RwLock<Scene>>,
+    pub scene: &'a Scene,
 }
 
-unsafe impl marker::Send for Raytracer {}
-unsafe impl marker::Sync for Raytracer {}
+unsafe impl<'a> marker::Send for Raytracer<'a> {}
+unsafe impl<'a> marker::Sync for Raytracer<'a> {}
 
-impl Raytracer {
-    pub fn new(width: usize, height: usize, fov: F, scene: Arc<RwLock<Scene>>) -> Raytracer {
+impl<'a> Raytracer<'a> {
+    pub fn new(width: usize, height: usize, fov: F, scene: &'a Scene) -> Raytracer<'a> {
         Raytracer {
             image: RwLock::new(vec!(Vector3::new(0.0, 0.0, 0.0); (width * height) as usize)),
             width, height,
@@ -74,20 +74,21 @@ impl Raytracer {
 
     pub fn render(&mut self) {
         let mut thread_handles = Vec::new();
-        const THREAD_COUNT: usize = 4;
+        const THREAD_COUNT: usize = 8;
 
-        let raytracer = Arc::new(self);
         for i in 0..THREAD_COUNT {
-            let raytracer = raytracer.clone();
+            let raytracer = &self;
             unsafe {
                 thread_handles.push(crossbeam_utils::thread::spawn_unchecked(move || {
                     let start = raytracer.height / THREAD_COUNT * i;
                     for y in start..(start + raytracer.height / THREAD_COUNT) {
                         for x in 0..raytracer.width {
-                                let ray = raytracer.generate_primary_ray(x, y);
-                                let result = raytracer.trace(&ray, Vector3::new(0.0, 0.0, 0.0), 2).1;
-                                raytracer.image.write().unwrap()[x + y * raytracer.width] = result;
+                            let ray = raytracer.generate_primary_ray(x, y);
+                            let result = raytracer.trace(&ray, Vector3::new(0.0, 0.0, 0.0), 2).1;
+                            raytracer.image.write().unwrap()[x + y * raytracer.width] = result;
                         }
+
+                        println!("Finished line {} of {}", y, raytracer.height);
                     }
                 }));
             }
@@ -104,7 +105,7 @@ impl Raytracer {
 
         let mut closest: (F, usize, Hit) = (123125.0, 12958125, Hit::default());
 
-        for (i, object) in self.scene.try_read().unwrap().objects.iter().enumerate() {
+        for (i, object) in self.scene.objects.iter().enumerate() {
             match object.check_ray(ray) {
                 Some(hit) => { 
                     let distance = ray.origin.distance(hit.position);
@@ -118,7 +119,7 @@ impl Raytracer {
 
         if closest.1 == 12958125 { return (0.001, Vector3::new(0.0, 0.0, 0.0)) };
         
-        let scene = self.scene.try_read().unwrap();
+        let scene = self.scene;
         let object = &scene.objects[closest.1];
         let hit = closest.2;
 
@@ -163,7 +164,7 @@ impl Raytracer {
         if bounces == 0 { return (closest.0, total.mul_element_wise(material_color)); }
 
         // Indirect lighting
-        const N: usize = 42;
+        const N: usize = 256;
 
         let mut total_indirect = Vector3::new(0.0, 0.0, 0.0);
         let local_cartesian = self.create_coordinate_system_of_n(hit.normal);
