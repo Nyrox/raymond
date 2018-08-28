@@ -30,42 +30,41 @@ fn main() {
     let now = Instant::now();
 
     let mut scene = Scene::new();
-    scene.objects.push(Box::new(Sphere { origin: Vector3::new(1.0, -0.5, 2.5), radius: 0.5, material: Material::Diffuse(
+    scene.objects.push(Object::Sphere(Sphere { origin: Vector3::new(1.0, -0.5, 2.5), radius: 0.5, material: Material::Diffuse(
         Vector3::new(1.0, 0.00, 0.00), 0.6
     )}));
-    scene.objects.push(Box::new(Sphere { origin: Vector3::new(-1.25, -0.25, 3.5), radius: 0.75, material: Material::Metal(
+    scene.objects.push(Object::Sphere(Sphere { origin: Vector3::new(-1.25, -0.25, 3.5), radius: 0.75, material: Material::Metal(
         Vector3::new(0.0, 0.25, 1.00), 0.15
     )}));
-    scene.objects.push(Box::new(Sphere { origin: Vector3::new(-0.1, -0.65, 2.2), radius: 0.35, material: Material::Metal(
+    scene.objects.push(Object::Sphere(Sphere { origin: Vector3::new(-0.1, -0.65, 2.2), radius: 0.35, material: Material::Metal(
         Vector3::new(1.0, 1.0, 0.0), 0.3,
     )}));
 
     // // Floor
-    scene.objects.push(Box::new(Plane { origin: Vector3::new(0.0, -1.0, 0.0), normal: Vector3::new(0.0, 1.0, 0.0), material: Material::Diffuse(
+    scene.objects.push(Object::Plane(Plane { origin: Vector3::new(0.0, -1.0, 0.0), normal: Vector3::new(0.0, 1.0, 0.0), material: Material::Diffuse(
         Vector3::new(0.75, 0.75, 0.75), 0.5
     )}));
     // Ceiling
-    scene.objects.push(Box::new(Plane { origin: Vector3::new(0.0, 2.0, 0.0), normal: Vector3::new(0.0, -1.0, 0.0), material: Material::Emission(
+    scene.objects.push(Object::Plane(Plane { origin: Vector3::new(0.0, 2.0, 0.0), normal: Vector3::new(0.0, -1.0, 0.0), material: Material::Emission(
         Vector3::new(0.9, 0.9, 0.9),
     )}));
     // Backwall
-    scene.objects.push(Box::new(Plane { origin: Vector3::new(0.0, 0.0, 5.0), normal: Vector3::new(0.0, 0.0, -1.0), material: Material::Diffuse(
+    scene.objects.push(Object::Plane(Plane { origin: Vector3::new(0.0, 0.0, 5.0), normal: Vector3::new(0.0, 0.0, -1.0), material: Material::Diffuse(
         Vector3::new(1.0, 1.0, 1.0), 0.5
     )}));
     // left wall
-    scene.objects.push(Box::new(Plane { origin: Vector3::new(-2.0, 0.0, 0.0), normal: Vector3::new(1.0, 0.0, 0.0), material: Material::Diffuse(
+    scene.objects.push(Object::Plane(Plane { origin: Vector3::new(-2.0, 0.0, 0.0), normal: Vector3::new(1.0, 0.0, 0.0), material: Material::Diffuse(
         Vector3::new(0.0, 0.0, 1.0), 0.5
     )}));
     // right wall
-    scene.objects.push(Box::new(Plane { origin: Vector3::new(2.0, 0.0, 0.0), normal: Vector3::new(-1.0, 0.0, 0.0), material: Material::Diffuse(
+    scene.objects.push(Object::Plane(Plane { origin: Vector3::new(2.0, 0.0, 0.0), normal: Vector3::new(-1.0, 0.0, 0.0), material: Material::Diffuse(
         Vector3::new(0.0, 1.0, 0.0), 0.5
     )}));
     
     // scene.lights.push(Light { position: Vector3::new(0.0, 1.95, 2.5), intensity: Vector3::new(0.8, 0.8, 1.0) });
     // scene.lights.push(Light { position: Vector3::new(1.75, -0.75, 1.0), intensity: Vector3::new(0.8, 1.0, 0.7) });
 
-    let mut scene = scene;
-    let mut raytracer = Raytracer::new(WIDTH, HEIGHT, 75.0, &scene);
+    let mut raytracer = Raytracer::new(WIDTH, HEIGHT, 75.0, scene.clone());
     raytracer.render();
 
     println!("Finished render.\nTotal render time: {}s\nTotal amount of trace calls: {}\nTotal amount of shadow rays cast: {}\n", 

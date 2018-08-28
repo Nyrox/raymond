@@ -51,21 +51,22 @@ pub fn element_wise_division(left: &Vector3<F>, right: &Vector3<F>) -> Vector3<F
     Vector3::new(left.x / right.x, left.y / right.y, left.z / right.z)
 }
 
-pub struct Raytracer<'a> {
-    pub image: RwLock<Vec<Vector3<F>>>,
+#[derive(Clone)]
+pub struct Raytracer {
+    pub image: Arc<RwLock<Vec<Vector3<F>>>>,
     pub width: usize,
     pub height: usize,
     pub fov: F,
-    pub scene: &'a Scene,
+    pub scene: Scene,
 }
 
-unsafe impl<'a> marker::Send for Raytracer<'a> {}
-unsafe impl<'a> marker::Sync for Raytracer<'a> {}
+unsafe impl<'a> marker::Send for Raytracer {}
+unsafe impl<'a> marker::Sync for Raytracer {}
 
-impl<'a> Raytracer<'a> {
-    pub fn new(width: usize, height: usize, fov: F, scene: &'a Scene) -> Raytracer<'a> {
+impl Raytracer {
+    pub fn new(width: usize, height: usize, fov: F, scene: Scene) -> Raytracer {
         Raytracer {
-            image: RwLock::new(vec!(Vector3::new(0.0, 0.0, 0.0); (width * height) as usize)),
+            image: Arc::new(RwLock::new(vec!(Vector3::new(0.0, 0.0, 0.0); (width * height) as usize))),
             width, height,
             fov,
             scene
@@ -74,10 +75,10 @@ impl<'a> Raytracer<'a> {
 
     pub fn render(&mut self) {
         let mut thread_handles = Vec::new();
-        const THREAD_COUNT: usize = 8;
+        const THREAD_COUNT: usize = 4;
 
         for i in 0..THREAD_COUNT {
-            let raytracer = &self;
+            let raytracer = self.clone();
             unsafe {
                 thread_handles.push(crossbeam_utils::thread::spawn_unchecked(move || {
                     let start = raytracer.height / THREAD_COUNT * i;
@@ -119,19 +120,19 @@ impl<'a> Raytracer<'a> {
 
         if closest.1 == 12958125 { return (0.001, Vector3::new(0.0, 0.0, 0.0)) };
         
-        let scene = self.scene;
+        let scene = &self.scene;
         let object = &scene.objects[closest.1];
         let hit = closest.2;
 
         let mut total = Vector3::new(0.0, 0.0, 0.0);
         
         match object.get_material() {
-            Material::Emission(intensity) => { return (closest.0, intensity); },
+            Material::Emission(intensity) => { return (closest.0, *intensity); },
             _ => {}
         }
         let (material_color, material_roughness, material_metalness) = match object.get_material() {
-            Material::Diffuse(color, roughness) => (color, roughness, 0.0),
-            Material::Metal(color, roughness) => (color, roughness, 1.0),
+            Material::Diffuse(color, roughness) => (color, *roughness, 0.0),
+            Material::Metal(color, roughness) => (color, *roughness, 1.0),
             _ => panic!()
         };
 
@@ -161,10 +162,10 @@ impl<'a> Raytracer<'a> {
             total += light.intensity * cos_theta * attenuation;
         }
 
-        if bounces == 0 { return (closest.0, total.mul_element_wise(material_color)); }
+        if bounces == 0 { return (closest.0, total.mul_element_wise(*material_color)); }
 
         // Indirect lighting
-        const N: usize = 256;
+        const N: usize = 96;
 
         let mut total_indirect = Vector3::new(0.0, 0.0, 0.0);
         let local_cartesian = self.create_coordinate_system_of_n(hit.normal);
@@ -172,7 +173,7 @@ impl<'a> Raytracer<'a> {
         
         let view_dir = (camera_pos - hit.position).normalize();
         let f0 = Vector3::new(0.04, 0.04, 0.04);
-        let f0 = Self::lerp_vec(f0, material_color, material_metalness);
+        let f0 = Self::lerp_vec(f0, *material_color, material_metalness);
 
         for i in 0..N {
             let sample = self.uniform_sample_hemisphere();
@@ -203,7 +204,7 @@ impl<'a> Raytracer<'a> {
             let denominator = 4.0 * hit.normal.dot(view_dir).max(0.0) * cos_theta + 0.001;
             let specular = nominator / denominator;
 
-            let output = (diffuse_part.mul_element_wise(material_color) / PI + specular).mul_element_wise(radiance) * cos_theta;
+            let output = (diffuse_part.mul_element_wise(*material_color) / PI + specular).mul_element_wise(radiance) * cos_theta;
 
             total_indirect += output;
         }
