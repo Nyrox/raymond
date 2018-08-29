@@ -107,7 +107,7 @@ impl RaytracerBuilder {
                     for y in start..(start + raytracer.config.height / THREAD_COUNT) {
                         for x in 0..raytracer.config.width {
                             let ray = raytracer.generate_primary_ray(x, y);
-                            let result = raytracer.trace(&ray, Vector3::new(0.0, 0.0, 0.0), 2).1;
+                            let result = raytracer.trace(&ray, Vector3::new(0.0, 0.0, 0.0), raytracer.config.num_bounces).1;
                             raytracer.image.write().unwrap()[x + y * raytracer.config.width] = result;
                         }
 
@@ -253,7 +253,8 @@ impl<'a> Raytracer<'a> {
         // Indirect lighting
         let N = self.config.num_samples;
 
-        let mut total_indirect = Vector3::new(0.0, 0.0, 0.0);
+        let mut total_indirect_specular = Vector3::new(0.0, 0.0, 0.0);
+        let mut total_indirect_diffuse = Vector3::new(0.0, 0.0, 0.0);
         let local_cartesian = self.create_coordinate_system_of_n(hit.normal);
         let local_cartesian_transform = Matrix3::from_cols(local_cartesian.0, hit.normal, local_cartesian.1);
         
@@ -283,6 +284,72 @@ impl<'a> Raytracer<'a> {
 
             diffuse_part *= 1.0 - material_metalness;
 
+            let output = (diffuse_part.mul_element_wise(*material_color) / PI).mul_element_wise(radiance) * cos_theta;
+
+            total_indirect_diffuse += output;
+        }
+        total_indirect_diffuse /= N as F * (1.0 / (2.0 * PI));
+
+        for i in 0..N {
+            // let sample = self.uniform_sample_hemisphere();
+
+            // importance sampling
+            // reflect vector
+            // let sample_world = 2.0 * view_dir.dot(hit.normal).max(0.0) * hit.normal - view_dir;
+            
+            // let sample_world = -local_cartesian_transform * sample_world.normalize();
+
+            // fn cartesian_to_spherical(s: Vector3<F>) -> (F, F) {
+            //     let r = (s.x.powf(2.0) + s.y.powf(2.0) + s.z.powf(2.0)).sqrt();
+            //     let phi = (s.z / r).acos();
+            //     let theta = (s.y / s.x).atan();
+            //     (phi, theta)
+            // }
+
+            // fn spherical_to_cartesian(phi: F, theta: F) -> Vector3<F> {
+            //     Vector3::new(phi.sin() * theta.cos(), theta.cos(), phi.sin() * theta.sin()).normalize()
+            // }
+
+            // let (mut phi, mut theta) = cartesian_to_spherical(sample_world);
+            // let a = material_roughness * material_roughness;
+            // phi += (rand::random::<F>() * 2.0 - 1.0) / (1.0 + (a*a - 1.0));
+            // theta += (rand::random::<F>() * 2.0 - 1.0) / (1.0 + (a*a - 1.0));
+
+            // let sample_world = (local_cartesian_transform * spherical_to_cartesian(phi, theta)).normalize();
+            
+            // let sample_world = (local_cartesian_transform * sample).normalize();
+
+            let a = material_roughness * material_roughness;
+            let r1 = rand::random::<F>() * 2.0 - 1.0;
+            let r2 = rand::random::<F>() * 2.0 - 1.0;
+            let phi = 2.0 * PI * r1;
+            let cos_theta = (1.0 - r2) / (1.0 + (1.0 + (a*a - 1.0) * r2)).sqrt();
+            let sin_theta = (1.0 - cos_theta * cos_theta).sqrt();
+            let h = Vector3::new(phi.cos() * sin_theta, phi.sin() * sin_theta, cos_theta);
+            let up = if hit.normal.z.abs() < 0.999 { Vector3::new(0.0, 0.0, 1.0) } else { Vector3::new(1.0, 0.0, 0.0) };
+            let tangent = up.cross(hit.normal).normalize();
+            let bitangent = hit.normal.cross(tangent);
+
+            let sample_world = (tangent * h.x + bitangent * h.y + hit.normal * h.z).normalize();
+
+            let incoming = self.trace(&Ray { origin: hit.position + sample_world * 0.001, direction: sample_world }, hit.position, bounces - 1);
+
+            let incoming_radiance = incoming.1;
+            let distance = incoming.0;
+            let cos_theta = hit.normal.dot(sample_world).max(0.0);
+            let attenuation = 1.0;
+            let radiance = incoming_radiance * attenuation;
+
+                let light_dir = sample_world.normalize();
+            let halfway = (light_dir + view_dir).normalize();
+
+            let fresnel = Self::fresnel_schlick(halfway.dot(view_dir).max(0.0), f0);
+
+            let specular_part = fresnel;
+            let mut diffuse_part = Vector3::new(1.0, 1.0, 1.0) - specular_part;
+
+            diffuse_part *= 1.0 - material_metalness;
+
             let D = Self::ggx_distribution(hit.normal, halfway, material_roughness);
             let G = Self::geometry_smith(hit.normal, view_dir, sample_world, material_roughness);
 
@@ -290,13 +357,13 @@ impl<'a> Raytracer<'a> {
             let denominator = 4.0 * hit.normal.dot(view_dir).max(0.0) * cos_theta + 0.001;
             let specular = nominator / denominator;
 
-            let output = (diffuse_part.mul_element_wise(*material_color) / PI + specular).mul_element_wise(radiance) * cos_theta;
+            let output = (specular).mul_element_wise(radiance) * cos_theta;
 
-            total_indirect += output;
+            total_indirect_specular += output;
         }
-        total_indirect /= N as F * (1.0 / (2.0 * PI));
+        total_indirect_specular /= N as F * (1.0 / (2.0 * PI));
 
-        return (closest.0, (total + total_indirect));
+        return (closest.0, (total + total_indirect_diffuse + total_indirect_specular));
     }
 
     fn ggx_distribution(n: Vector3<F>, h: Vector3<F>, roughness: F) -> F {
