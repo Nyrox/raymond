@@ -291,46 +291,21 @@ impl<'a> Raytracer<'a> {
         total_indirect_diffuse /= N as F * (1.0 / (2.0 * PI));
 
         for i in 0..N {
-            // let sample = self.uniform_sample_hemisphere();
-
             // importance sampling
-            // reflect vector
-            // let sample_world = 2.0 * view_dir.dot(hit.normal).max(0.0) * hit.normal - view_dir;
-            
-            // let sample_world = -local_cartesian_transform * sample_world.normalize();
+            let ((phi, theta), pdf) = (|n: Vector3<F>, r: F| {
+                let rand_theta: F = rand::random();
+                let theta: F = (r*r * (rand_theta / (1.0 - rand_theta)).sqrt()).atan();
+                let phi: F = 2.0 * PI * rand::random::<F>();
 
-            // fn cartesian_to_spherical(s: Vector3<F>) -> (F, F) {
-            //     let r = (s.x.powf(2.0) + s.y.powf(2.0) + s.z.powf(2.0)).sqrt();
-            //     let phi = (s.z / r).acos();
-            //     let theta = (s.y / s.x).atan();
-            //     (phi, theta)
-            // }
-
-            // fn spherical_to_cartesian(phi: F, theta: F) -> Vector3<F> {
-            //     Vector3::new(phi.sin() * theta.cos(), theta.cos(), phi.sin() * theta.sin()).normalize()
-            // }
-
-            // let (mut phi, mut theta) = cartesian_to_spherical(sample_world);
-            // let a = material_roughness * material_roughness;
-            // phi += (rand::random::<F>() * 2.0 - 1.0) / (1.0 + (a*a - 1.0));
-            // theta += (rand::random::<F>() * 2.0 - 1.0) / (1.0 + (a*a - 1.0));
-
-            // let sample_world = (local_cartesian_transform * spherical_to_cartesian(phi, theta)).normalize();
-            
-            // let sample_world = (local_cartesian_transform * sample).normalize();
+                ((phi, theta), 0.0)
+            })(hit.normal, material_roughness);
 
             let reflect = 2.0 * view_dir.dot(hit.normal).max(0.0) * hit.normal - view_dir;
             let reflect = reflect.normalize();
-            let a = material_roughness * material_roughness;
-            let r1 = rand::random::<F>() * 2.0 - 1.0;
-            let r2 = rand::random::<F>() * 2.0 - 1.0;
-            let phi = 2.0 * PI * r1;
-            let cos_theta = ((1.0 - r2) / (1.0 + (a*a - 1.0) * r2)).sqrt();
-            let sin_theta = (1.0 - cos_theta * cos_theta).sqrt();
-            let h = Vector3::new(phi.cos() * sin_theta, phi.sin() * sin_theta, cos_theta);
+            let h = Vector3::new(phi.cos() * theta.sin(), phi.sin() * theta.sin(), theta.cos()).normalize();
             let up = if reflect.z.abs() < 0.999 { Vector3::new(0.0, 0.0, 1.0) } else { Vector3::new(1.0, 0.0, 0.0) };
             let tangent = up.cross(reflect).normalize();
-            let bitangent =  reflect.cross(tangent);
+            let bitangent = reflect.cross(tangent).normalize();
 
             let sample_world = (tangent * h.x + bitangent * h.y + reflect * h.z).normalize();
 
@@ -361,9 +336,16 @@ impl<'a> Raytracer<'a> {
 
             let output = (specular).mul_element_wise(radiance) * cos_theta;
 
-            total_indirect_specular += output;
+            // pdf
+            let pdf = {
+                let a = material_roughness * material_roughness;
+                let numerator = 2.0 *  a*a * theta.cos() * theta.sin();
+                let denumerator = ((a*a - 1.0) * theta.cos()*theta.cos() + 1.0).powf(2.0);
+                (numerator / denumerator) / (4.0 * halfway.dot(view_dir).max(0.0))
+            };
+            total_indirect_specular += output / pdf;
         }
-        total_indirect_specular /= N as F * (1.0 / (2.0 * PI));
+        total_indirect_specular /= N as F;
 
         return (closest.0, (total + total_indirect_diffuse + total_indirect_specular));
     }
