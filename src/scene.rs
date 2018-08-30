@@ -1,27 +1,46 @@
 use cgmath::Vector3;
 use cgmath::prelude::*;
 use raytracer::{Ray, Hit};
+
 type F = f32;
 
-
-
 #[derive(Debug, Clone)]
-pub struct Material {
-    pub color: Vector3<F>,
+pub enum Material {
+    Diffuse(Vector3<F>, F),
+    Metal(Vector3<F>, F),
+    Emission(Vector3<F>),
 }
 
-pub trait Object {
-    fn get_material(&self) -> Material;
-    fn check_ray(&self, &Ray) -> Option<Hit>;
+#[derive(Clone)]
+pub enum Object {
+    Plane(Plane),
+    Sphere(Sphere),
 }
 
+impl Object {
+    pub fn get_material(&self) -> &Material {
+        match self {
+            &Object::Plane(ref p) => &p.material,
+            &Object::Sphere(ref s) => &s.material,
+        }
+    }
+
+    pub fn check_ray(&self, ray: &Ray) -> Option<Hit> {
+        match self {
+            &Object::Plane(ref p) => p.check_ray(ray),
+            &Object::Sphere(ref s) => s.check_ray(ray),
+        }
+    }
+}
+
+#[derive(Clone)]
 pub struct Plane {
     pub origin: Vector3<F>,
     pub normal: Vector3<F>,
     pub material: Material,
 }
 
-impl Object for Plane {
+impl Plane {
     fn get_material(&self) -> Material {
         self.material.clone()
     }
@@ -43,13 +62,14 @@ impl Object for Plane {
     }
 }
 
+#[derive(Clone)]
 pub struct Sphere {
     pub origin: Vector3<F>,
     pub radius: F,
     pub material: Material,
 }
 
-impl Object for Sphere {
+impl Sphere {
     fn get_material(&self) -> Material {
         self.material.clone()
     }
@@ -72,13 +92,15 @@ impl Object for Sphere {
     }
 }
 
+#[derive(Clone)]
 pub struct Light {
     pub position: Vector3<F>,
     pub intensity: Vector3<F>,
 }
 
+#[derive(Clone)]
 pub struct Scene {
-    pub objects: Vec<Box<dyn Object>>,
+    pub objects: Vec<Object>,
     pub lights: Vec<Light>,
 }
 

@@ -1,12 +1,150 @@
-use scene::Scene;
+use scene::*;
 use num_traits;
 use cgmath::prelude::*;
 use cgmath::*;
 use std::cell::RefCell;
 use rand;
+use crossbeam_utils;
+
+use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT, Ordering};
+use std::time::{Duration, Instant};
+use std::sync::mpsc::channel;
+use std::thread;
+use std::sync::Mutex;
+use std::sync::Arc;
+use std::sync::RwLock;
+use std::marker;
+
+static LINE_COUNT: AtomicUsize = ATOMIC_USIZE_INIT;
 
 type F = f32;
-const PI: F = 3.14;
+const PI: F = 3.141592;
+
+
+pub fn build() -> RaytracerBuilder {
+    RaytracerBuilder::new()
+}
+
+#[derive(Clone, Debug)]
+pub struct RaytracerConfig {
+    pub num_workers: usize,
+    pub num_bounces: usize,
+    pub num_samples: usize,
+    pub width: usize,
+    pub height: usize,
+    pub fov: F,
+}
+
+use num_cpus;
+impl RaytracerConfig {
+    pub fn new() -> Self {
+        RaytracerConfig {
+            num_workers: num_cpus::get(),
+            num_bounces: 2,
+            num_samples: 16,
+            width: 0,
+            height: 0,
+            fov: 65.0,
+        }
+    }
+}
+
+pub struct RaytracerBuilder {
+    pub config: RaytracerConfig,
+}
+
+impl RaytracerBuilder {
+    pub fn new() -> Self {
+        RaytracerBuilder { 
+            config: RaytracerConfig::new(),
+        }
+    }
+
+    pub fn with_workers(mut self, t: Option<usize>) -> Self {
+        self.config.num_workers = match t {
+            Some(t) => t,
+            None => num_cpus::get(),
+        };
+        return self;
+    }
+
+    pub fn with_bounces(mut self, b: usize) -> Self {
+        self.config.num_bounces = b;
+        return self;
+    }
+
+    pub fn with_samples(mut self, s: usize) -> Self {
+        self.config.num_samples = s;
+        return self;
+    }
+
+    pub fn with_canvas(mut self, width: usize, height: usize) -> Self {
+        self.config.width = width;
+        self.config.height = height;
+        return self;
+    }
+
+    pub fn with_camera_fov(mut self, fov: F) -> Self {
+        self.config.fov = fov;
+        return self;
+    } 
+
+    pub fn launch(self, scene: Scene) -> Vec<Vector3<u8>> {
+        let mut thread_handles = Vec::new();
+        let THREAD_COUNT = self.config.num_workers;
+
+        let image = RwLock::new(vec![Vector3::new(0.0, 0.0, 0.0); self.config.width * self.config.height]);
+
+        for i in 0..THREAD_COUNT {
+            let raytracer = Raytracer { 
+                config: self.config.clone(),
+                scene: scene.clone(),
+                image: &image,
+            };
+            unsafe {
+                thread_handles.push(crossbeam_utils::thread::spawn_unchecked(move || {
+                    let start = raytracer.config.height / THREAD_COUNT * i;
+                    for y in start..(start + raytracer.config.height / THREAD_COUNT) {
+                        for x in 0..raytracer.config.width {
+                            let ray = raytracer.generate_primary_ray(x, y);
+                            let result = raytracer.trace(&ray, Vector3::new(0.0, 0.0, 0.0), 2).1;
+                            raytracer.image.write().unwrap()[x + y * raytracer.config.width] = result;
+                        }
+
+                        println!("Finished line {} of {}", y, raytracer.config.height);
+                    }
+                }));
+            }
+        }
+
+        for h in thread_handles {
+            h.join().unwrap();
+        }
+
+        let mut export = vec![Vector3::new(0, 0, 0); self.config.width * self.config.height];
+        for (i, p) in image.into_inner().unwrap().iter().enumerate() {
+            // let tone_mapped = element_wise_division(p , &(p + Vector3::new(1.0, 1.0, 1.0)));
+            let exposure = 1.0;
+            let gamma = 2.2;
+            let tone_mapped = Vector3::new(1.0, 1.0, 1.0) - element_wise_map(&(p * -1.0 * exposure), |e| F::exp(e));
+            let tone_mapped = element_wise_map(&tone_mapped, |x| x.powf(1.0 / gamma));
+
+            for i in 0..3 {
+                let e = tone_mapped[i];
+                if e > 1.0 || e < 0.0 {
+                    println!("Problem: {:?}", e);
+                }
+            }
+            
+            match (tone_mapped * 255.0).cast() {
+                Some(v) => { export[i] = v; },
+                None => { println!("PROBLEM: {:?}", tone_mapped * 255.0) }
+            };
+        }
+
+        return export;
+    }
+}
 
 pub struct Ray {
     pub origin: Vector3<F>,
@@ -24,7 +162,6 @@ impl Default for Hit {
         Hit { position: Vector3::new(0.0, 0.0, 0.0), normal: Vector3::new(0.0, 0.0, 0.0) }
     }
 }
-
 impl Ray {
     pub fn new (origin: Vector3<F>, direction: Vector3<F>) -> Ray {
         Ray { origin, direction }
@@ -39,39 +176,23 @@ pub fn element_wise_division(left: &Vector3<F>, right: &Vector3<F>) -> Vector3<F
     Vector3::new(left.x / right.x, left.y / right.y, left.z / right.z)
 }
 
+#[derive(Clone)]
 pub struct Raytracer<'a> {
-    pub image: Vec<Vector3<F>>,
-    pub width: usize,
-    pub height: usize,
-    pub fov: F,
-    pub scene: &'a RefCell<Scene>,
+    pub image: &'a RwLock<Vec<Vector3<F>>>,
+    pub config: RaytracerConfig,
+    pub scene: Scene,
 }
 
+unsafe impl<'a> marker::Send for Raytracer<'a> {}
+unsafe impl<'a> marker::Sync for Raytracer<'a> {}
 
 impl<'a> Raytracer<'a> {
-    pub fn new(width: usize, height: usize, fov: F, scene: &'a RefCell<Scene>) -> Raytracer<'a> {
-        Raytracer {
-            image: vec!(Vector3::new(0.0, 0.0, 0.0); (width * height) as usize),
-            width, height,
-            fov,
-            scene
-        }
-    }
+    fn trace(&self, ray: &Ray, camera_pos: Vector3<F>, bounces: usize) -> (F, Vector3<F>) {
+        // super::TRACE_COUNT.fetch_add(1, Ordering::Relaxed);
 
-    pub fn render(&mut self) {
-        for y in 0..self.height {
-            for x in 0..self.width {
-                let ray = self.generate_primary_ray(x, y);
-
-                self.image[x + y * self.width] = self.trace(&ray, 2);
-            }
-        }
-    }
-
-    fn trace(&mut self, ray: &Ray, bounces: usize) -> Vector3<F> {
         let mut closest: (F, usize, Hit) = (123125.0, 12958125, Hit::default());
 
-        for (i, object) in self.scene.borrow().objects.iter().enumerate() {
+        for (i, object) in self.scene.objects.iter().enumerate() {
             match object.check_ray(ray) {
                 Some(hit) => { 
                     let distance = ray.origin.distance(hit.position);
@@ -83,19 +204,33 @@ impl<'a> Raytracer<'a> {
             }
         }
 
-        if closest.1 == 12958125 { return Vector3::new(0.0, 0.0, 0.0) };
+        if closest.1 == 12958125 { return (0.001, Vector3::new(0.0, 0.0, 0.0)) };
         
-        let scene = self.scene.borrow();
+        let scene = &self.scene;
         let object = &scene.objects[closest.1];
         let hit = closest.2;
 
         let mut total = Vector3::new(0.0, 0.0, 0.0);
         
+        match object.get_material() {
+            Material::Emission(intensity) => { return (closest.0, *intensity); },
+            _ => {}
+        }
+        let (material_color, material_roughness, material_metalness) = match object.get_material() {
+            Material::Diffuse(color, roughness) => (color, *roughness, 0.0),
+            Material::Metal(color, roughness) => (color, *roughness, 1.0),
+            _ => panic!()
+        };
+
         // Direct lighting
         'light_iter: for light in scene.lights.iter() {
             // Shadow
+            let now = Instant::now();
+
             for (index, shadow_object) in scene.objects.iter().enumerate() {
                 if closest.1 == index { continue; }
+                super::SHADOW_RAY_COUNT.fetch_add(1, Ordering::Relaxed);
+
                 let shadow_hit = shadow_object.check_ray(&Ray { origin: light.position, direction: (hit.position - light.position).normalize() });
                 if let Some(shadow_hit) = shadow_hit {
                     if shadow_hit.position.distance(light.position) < light.position.distance(hit.position) {
@@ -104,6 +239,8 @@ impl<'a> Raytracer<'a> {
                 }
             }
 
+            super::SHADOW_TOTAL_TIME.fetch_add((Instant::now() - now).as_nanos() as usize, Ordering::Relaxed);
+
             let distance = light.position.distance(hit.position);
             let attenuation = 1.0 / (distance * distance);
             let cos_theta = hit.normal.dot((light.position - hit.position).normalize()).max(0.0);
@@ -111,23 +248,88 @@ impl<'a> Raytracer<'a> {
             total += light.intensity * cos_theta * attenuation;
         }
 
-        if bounces == 0 { return total.mul_element_wise(object.get_material().color) / PI; }
+        if bounces == 0 { return (closest.0, total.mul_element_wise(*material_color)); }
 
         // Indirect lighting
-        const N: usize = 4;
+        let N = self.config.num_samples;
 
         let mut total_indirect = Vector3::new(0.0, 0.0, 0.0);
         let local_cartesian = self.create_coordinate_system_of_n(hit.normal);
         let local_cartesian_transform = Matrix3::from_cols(local_cartesian.0, hit.normal, local_cartesian.1);
+        
+        let view_dir = (camera_pos - hit.position).normalize();
+        let f0 = Vector3::new(0.04, 0.04, 0.04);
+        let f0 = Self::lerp_vec(f0, *material_color, material_metalness);
+
         for i in 0..N {
             let sample = self.uniform_sample_hemisphere();
-            let sample_world = local_cartesian_transform * sample;
+            let sample_world = (local_cartesian_transform * sample).normalize();
 
-            total_indirect += sample_world.dot(hit.normal).max(0.0) * self.trace(&Ray { origin: hit.position, direction: sample_world }, bounces - 1);
+            let incoming = self.trace(&Ray { origin: hit.position + sample_world * 0.001, direction: sample_world }, hit.position, bounces - 1);
+
+            let incoming_radiance = incoming.1;
+            let distance = incoming.0;
+            let cos_theta = hit.normal.dot(sample_world).max(0.0);
+            let attenuation = 1.0;
+            let radiance = incoming_radiance * attenuation;
+
+            let light_dir = sample_world.normalize();
+            let halfway = (light_dir + view_dir).normalize();
+
+            let fresnel = Self::fresnel_schlick(halfway.dot(view_dir).max(0.0), f0);
+
+            let specular_part = fresnel;
+            let mut diffuse_part = Vector3::new(1.0, 1.0, 1.0) - specular_part;
+
+            diffuse_part *= 1.0 - material_metalness;
+
+            let D = Self::ggx_distribution(hit.normal, halfway, material_roughness);
+            let G = Self::geometry_smith(hit.normal, view_dir, sample_world, material_roughness);
+
+            let nominator = D * G * fresnel;
+            let denominator = 4.0 * hit.normal.dot(view_dir).max(0.0) * cos_theta + 0.001;
+            let specular = nominator / denominator;
+
+            let output = (diffuse_part.mul_element_wise(*material_color) / PI + specular).mul_element_wise(radiance) * cos_theta;
+
+            total_indirect += output;
         }
         total_indirect /= N as F * (1.0 / (2.0 * PI));
 
-        return (total + total_indirect).mul_element_wise(object.get_material().color) / PI;
+        return (closest.0, (total + total_indirect));
+    }
+
+    fn ggx_distribution(n: Vector3<F>, h: Vector3<F>, roughness: F) -> F {
+        let nominator = roughness.powf(2.0);
+        let denominator = n.dot(h).max(0.0).powf(2.0) * (roughness.powf(2.0) - 1.0) + 1.0;
+        let denominator = PI * denominator * denominator;
+        return nominator / denominator;
+    }
+
+    fn geometry_schlick_ggx(n: Vector3<F>, v: Vector3<F>, k: F) -> F {
+        let n_dot_v = n.dot(v).max(0.0);
+        let k = (k*k) / 8.0;
+
+        let nominator = n_dot_v;
+        let denominator = n_dot_v * (1.0 - k) + k;
+
+        return nominator / denominator;
+    }
+
+    fn geometry_smith(n: Vector3<F>, v: Vector3<F>, l: Vector3<F>, k: F) -> F {
+        return Self::geometry_schlick_ggx(n, v, k) * Self::geometry_schlick_ggx(n, l, k);
+    }
+
+    fn fresnel_schlick(cos_theta: F, F0: Vector3<F>) -> Vector3<F> {
+        return F0 + (Vector3::new(1.0, 1.0, 1.0) - F0) * (1.0 - cos_theta).powf(5.0);
+    }
+
+    fn lerp_vec(min: Vector3<F>, max: Vector3<F>, a: F) -> Vector3<F> {
+        Vector3::new(Self::lerp(min.x, max.x, a), Self::lerp(min.y, max.y, a), Self::lerp(min.z, max.z, a))
+    }
+
+    fn lerp(min: F, max: F, a: F) -> F {
+        min + a * (max - min)
     }
 
     fn uniform_sample_hemisphere(&self) -> Vector3<F> {
@@ -142,36 +344,25 @@ impl<'a> Raytracer<'a> {
     }
     
     fn create_coordinate_system_of_n(&self, n: Vector3<F>) -> (Vector3<F>, Vector3<F>) {
-        let nt = Vector3::new(n.z, 0.0, -n.x).normalize();
+        let mut nt;
+        if n.x.abs() > n.y.abs() {
+            nt = Vector3::new(n.z, 0.0, -n.x).normalize();
+        }
+        else {
+            nt = Vector3::new(0.0, -n.z, n.y).normalize();
+        }
         let nb = n.cross(nt);
 
         return (nt, nb);
     }
-    
-
-    // Exports the internal HDR format to RGB for saving or display
-    pub fn export_image(&self) -> Vec<Vector3<u8>> {
-        let mut export: Vec<Vector3<u8>> = vec!(Vector3::new(0, 0, 0); (self.width * self.height) as usize);
-
-        for (i, p) in self.image.iter().enumerate() {
-            // let tone_mapped = element_wise_division(p , &(p + Vector3::new(1.0, 1.0, 1.0)));
-            let exposure = 1.0;
-            let gamma = 2.2;
-            let tone_mapped = Vector3::new(1.0, 1.0, 1.0) - element_wise_map(&(p * -1.0 * exposure), |e| F::exp(e));
-            let tone_mapped = element_wise_map(&tone_mapped, |x| x.powf(1.0 / gamma));
-            export[i] = (tone_mapped * 255.0).cast().unwrap();
-        }
-
-        return export;
-    }
 
     fn generate_primary_ray(&self, x: usize, y: usize) -> Ray {
-        let width = self.width as f32; let height = self.height as f32;
+        let width = self.config.width as f32; let height = self.config.height as f32;
         let x = x as f32; let y = y as f32;
         let aspect = width / height;
 
-        let px = (2.0 * ((x + 0.5) / width) - 1.0) * F::tan(self.fov / 2.0 * PI / 180.0) * aspect;
-        let py = (1.0 - 2.0 * ((y + 0.5) / height)) * F::tan(self.fov / 2.0 * PI / 180.0);
+        let px = (2.0 * ((x + 0.5) / width) - 1.0) * F::tan(self.config.fov / 2.0 * PI / 180.0) * aspect;
+        let py = (1.0 - 2.0 * ((y + 0.5) / height)) * F::tan(self.config.fov / 2.0 * PI / 180.0);
 
         Ray::new(Vector3::new(0.0, 0.0, 0.0), Vector3::new(px, py, 1.0).normalize())
     }
