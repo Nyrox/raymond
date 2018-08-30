@@ -17,7 +17,7 @@ use std::marker;
 
 static LINE_COUNT: AtomicUsize = ATOMIC_USIZE_INIT;
 
-type F = f32;
+type F = f64;
 const PI: F = 3.141592;
 
 
@@ -319,18 +319,20 @@ impl<'a> Raytracer<'a> {
             
             // let sample_world = (local_cartesian_transform * sample).normalize();
 
+            let reflect = 2.0 * view_dir.dot(hit.normal).max(0.0) * hit.normal - view_dir;
+            let reflect = reflect.normalize();
             let a = material_roughness * material_roughness;
             let r1 = rand::random::<F>() * 2.0 - 1.0;
             let r2 = rand::random::<F>() * 2.0 - 1.0;
             let phi = 2.0 * PI * r1;
-            let cos_theta = (1.0 - r2) / (1.0 + (1.0 + (a*a - 1.0) * r2)).sqrt();
+            let cos_theta = ((1.0 - r2) / (1.0 + (a*a - 1.0) * r2)).sqrt();
             let sin_theta = (1.0 - cos_theta * cos_theta).sqrt();
             let h = Vector3::new(phi.cos() * sin_theta, phi.sin() * sin_theta, cos_theta);
-            let up = if hit.normal.z.abs() < 0.999 { Vector3::new(0.0, 0.0, 1.0) } else { Vector3::new(1.0, 0.0, 0.0) };
-            let tangent = up.cross(hit.normal).normalize();
-            let bitangent = hit.normal.cross(tangent);
+            let up = if reflect.z.abs() < 0.999 { Vector3::new(0.0, 0.0, 1.0) } else { Vector3::new(1.0, 0.0, 0.0) };
+            let tangent = up.cross(reflect).normalize();
+            let bitangent =  reflect.cross(tangent);
 
-            let sample_world = (tangent * h.x + bitangent * h.y + hit.normal * h.z).normalize();
+            let sample_world = (tangent * h.x + bitangent * h.y + reflect * h.z).normalize();
 
             let incoming = self.trace(&Ray { origin: hit.position + sample_world * 0.001, direction: sample_world }, hit.position, bounces - 1);
 
@@ -340,7 +342,7 @@ impl<'a> Raytracer<'a> {
             let attenuation = 1.0;
             let radiance = incoming_radiance * attenuation;
 
-                let light_dir = sample_world.normalize();
+            let light_dir = sample_world.normalize();
             let halfway = (light_dir + view_dir).normalize();
 
             let fresnel = Self::fresnel_schlick(halfway.dot(view_dir).max(0.0), f0);
@@ -353,7 +355,7 @@ impl<'a> Raytracer<'a> {
             let D = Self::ggx_distribution(hit.normal, halfway, material_roughness);
             let G = Self::geometry_smith(hit.normal, view_dir, sample_world, material_roughness);
 
-            let nominator = D * G * fresnel;
+            let nominator = D * G.min(1.0) * fresnel;
             let denominator = 4.0 * hit.normal.dot(view_dir).max(0.0) * cos_theta + 0.001;
             let specular = nominator / denominator;
 
@@ -367,15 +369,17 @@ impl<'a> Raytracer<'a> {
     }
 
     fn ggx_distribution(n: Vector3<F>, h: Vector3<F>, roughness: F) -> F {
-        let nominator = roughness.powf(2.0);
-        let denominator = n.dot(h).max(0.0).powf(2.0) * (roughness.powf(2.0) - 1.0) + 1.0;
+        let a2 = roughness*roughness;
+        let NdotH = n.dot(h).max(0.0);
+
+        let nominator = a2;
+        let denominator = NdotH.powf(2.0) * (a2 - 1.0) + 1.0;
         let denominator = PI * denominator * denominator;
         return nominator / denominator;
     }
 
     fn geometry_schlick_ggx(n: Vector3<F>, v: Vector3<F>, k: F) -> F {
         let n_dot_v = n.dot(v).max(0.0);
-        let k = (k*k) / 8.0;
 
         let nominator = n_dot_v;
         let denominator = n_dot_v * (1.0 - k) + k;
@@ -424,8 +428,8 @@ impl<'a> Raytracer<'a> {
     }
 
     fn generate_primary_ray(&self, x: usize, y: usize) -> Ray {
-        let width = self.config.width as f32; let height = self.config.height as f32;
-        let x = x as f32; let y = y as f32;
+        let width = self.config.width as F; let height = self.config.height as F;
+        let x = x as F; let y = y as F;
         let aspect = width / height;
 
         let px = (2.0 * ((x + 0.5) / width) - 1.0) * F::tan(self.config.fov / 2.0 * PI / 180.0) * aspect;

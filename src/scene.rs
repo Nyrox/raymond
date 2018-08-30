@@ -2,7 +2,7 @@ use cgmath::Vector3;
 use cgmath::prelude::*;
 use raytracer::{Ray, Hit};
 
-type F = f32;
+type F = f64;
 
 #[derive(Debug, Clone)]
 pub enum Material {
