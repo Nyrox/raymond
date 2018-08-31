@@ -17,7 +17,7 @@ use std::marker;
 
 static LINE_COUNT: AtomicUsize = ATOMIC_USIZE_INIT;
 
-type F = f32;
+type F = f64;
 const PI: F = 3.141592;
 
 
@@ -107,7 +107,7 @@ impl RaytracerBuilder {
                     for y in start..(start + raytracer.config.height / THREAD_COUNT) {
                         for x in 0..raytracer.config.width {
                             let ray = raytracer.generate_primary_ray(x, y);
-                            let result = raytracer.trace(&ray, Vector3::new(0.0, 0.0, 0.0), 2).1;
+                            let result = raytracer.trace(&ray, Vector3::new(0.0, 0.0, 0.0), raytracer.config.num_bounces).1;
                             raytracer.image.write().unwrap()[x + y * raytracer.config.width] = result;
                         }
 
@@ -253,7 +253,8 @@ impl<'a> Raytracer<'a> {
         // Indirect lighting
         let N = self.config.num_samples;
 
-        let mut total_indirect = Vector3::new(0.0, 0.0, 0.0);
+        let mut total_indirect_specular = Vector3::new(0.0, 0.0, 0.0);
+        let mut total_indirect_diffuse = Vector3::new(0.0, 0.0, 0.0);
         let local_cartesian = self.create_coordinate_system_of_n(hit.normal);
         let local_cartesian_transform = Matrix3::from_cols(local_cartesian.0, hit.normal, local_cartesian.1);
         
@@ -283,32 +284,84 @@ impl<'a> Raytracer<'a> {
 
             diffuse_part *= 1.0 - material_metalness;
 
+            let output = (diffuse_part.mul_element_wise(*material_color) / PI).mul_element_wise(radiance) * cos_theta;
+
+            total_indirect_diffuse += output;
+        }
+        total_indirect_diffuse /= N as F * (1.0 / (2.0 * PI));
+
+        for i in 0..N {
+            // importance sampling
+            let ((phi, theta), pdf) = (|n: Vector3<F>, r: F| {
+                let rand_theta: F = rand::random();
+                let theta: F = (r*r * (rand_theta / (1.0 - rand_theta)).sqrt()).atan();
+                let phi: F = 2.0 * PI * rand::random::<F>();
+
+                ((phi, theta), 0.0)
+            })(hit.normal, material_roughness);
+
+            let reflect = 2.0 * view_dir.dot(hit.normal).max(0.0) * hit.normal - view_dir;
+            let reflect = reflect.normalize();
+            let h = Vector3::new(phi.cos() * theta.sin(), phi.sin() * theta.sin(), theta.cos()).normalize();
+            let up = if reflect.z.abs() < 0.999 { Vector3::new(0.0, 0.0, 1.0) } else { Vector3::new(1.0, 0.0, 0.0) };
+            let tangent = up.cross(reflect).normalize();
+            let bitangent = reflect.cross(tangent).normalize();
+
+            let sample_world = (tangent * h.x + bitangent * h.y + reflect * h.z).normalize();
+
+            let incoming = self.trace(&Ray { origin: hit.position + sample_world * 0.001, direction: sample_world }, hit.position, bounces - 1);
+
+            let incoming_radiance = incoming.1;
+            let distance = incoming.0;
+            let cos_theta = hit.normal.dot(sample_world).max(0.0);
+            let attenuation = 1.0;
+            let radiance = incoming_radiance * attenuation;
+
+            let light_dir = sample_world.normalize();
+            let halfway = (light_dir + view_dir).normalize();
+
+            let fresnel = Self::fresnel_schlick(halfway.dot(view_dir).max(0.0), f0);
+
+            let specular_part = fresnel;
+            let mut diffuse_part = Vector3::new(1.0, 1.0, 1.0) - specular_part;
+
+            diffuse_part *= 1.0 - material_metalness;
+
             let D = Self::ggx_distribution(hit.normal, halfway, material_roughness);
             let G = Self::geometry_smith(hit.normal, view_dir, sample_world, material_roughness);
 
-            let nominator = D * G * fresnel;
+            let nominator = D * G.min(1.0) * fresnel;
             let denominator = 4.0 * hit.normal.dot(view_dir).max(0.0) * cos_theta + 0.001;
             let specular = nominator / denominator;
 
-            let output = (diffuse_part.mul_element_wise(*material_color) / PI + specular).mul_element_wise(radiance) * cos_theta;
+            let output = (specular).mul_element_wise(radiance) * cos_theta;
 
-            total_indirect += output;
+            // pdf
+            let pdf = {
+                let a = material_roughness * material_roughness;
+                let numerator = 2.0 *  a*a * theta.cos() * theta.sin();
+                let denumerator = ((a*a - 1.0) * theta.cos()*theta.cos() + 1.0).powf(2.0);
+                (D * hit.normal.dot(halfway).max(0.0)) / (4.0 * halfway.dot(view_dir).max(0.0)) + 0.0001
+            };
+            total_indirect_specular += output / pdf;
         }
-        total_indirect /= N as F * (1.0 / (2.0 * PI));
+        total_indirect_specular /= N as F;
 
-        return (closest.0, (total + total_indirect));
+        return (closest.0, (total + total_indirect_diffuse + total_indirect_specular));
     }
 
     fn ggx_distribution(n: Vector3<F>, h: Vector3<F>, roughness: F) -> F {
-        let nominator = roughness.powf(2.0);
-        let denominator = n.dot(h).max(0.0).powf(2.0) * (roughness.powf(2.0) - 1.0) + 1.0;
+        let a2 = roughness*roughness;
+        let NdotH = n.dot(h).max(0.0);
+
+        let nominator = a2;
+        let denominator = NdotH.powf(2.0) * (a2 - 1.0) + 1.0;
         let denominator = PI * denominator * denominator;
         return nominator / denominator;
     }
 
     fn geometry_schlick_ggx(n: Vector3<F>, v: Vector3<F>, k: F) -> F {
         let n_dot_v = n.dot(v).max(0.0);
-        let k = (k*k) / 8.0;
 
         let nominator = n_dot_v;
         let denominator = n_dot_v * (1.0 - k) + k;
@@ -357,8 +410,8 @@ impl<'a> Raytracer<'a> {
     }
 
     fn generate_primary_ray(&self, x: usize, y: usize) -> Ray {
-        let width = self.config.width as f32; let height = self.config.height as f32;
-        let x = x as f32; let y = y as f32;
+        let width = self.config.width as F; let height = self.config.height as F;
+        let x = x as F; let y = y as F;
         let aspect = width / height;
 
         let px = (2.0 * ((x + 0.5) / width) - 1.0) * F::tan(self.config.fov / 2.0 * PI / 180.0) * aspect;
