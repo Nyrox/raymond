@@ -66,7 +66,7 @@ fn main() {
     
     // scene.lights.push(Light { position: Vector3::new(0.0, 1.95, 2.5), intensity: Vector3::new(0.8, 0.8, 1.0) });
     // scene.lights.push(Light { position: Vector3::new(1.75, -0.75, 1.0), intensity: Vector3::new(0.8, 1.0, 0.7) });
-    let HEIGHT = 400;
+    let HEIGHT = 480;
     let WIDTH = HEIGHT / 9 * 16;
     let final_image: Vec<[u8; 3]> = raytracer::build()
         .with_canvas(WIDTH, HEIGHT)

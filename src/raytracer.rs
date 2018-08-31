@@ -269,10 +269,8 @@ impl<'a> Raytracer<'a> {
             let incoming = self.trace(&Ray { origin: hit.position + sample_world * 0.001, direction: sample_world }, hit.position, bounces - 1);
 
             let incoming_radiance = incoming.1;
-            let distance = incoming.0;
             let cos_theta = hit.normal.dot(sample_world).max(0.0);
-            let attenuation = 1.0;
-            let radiance = incoming_radiance * attenuation;
+            let radiance = incoming_radiance;
 
             let light_dir = sample_world.normalize();
             let halfway = (light_dir + view_dir).normalize();
@@ -311,26 +309,17 @@ impl<'a> Raytracer<'a> {
 
             let incoming = self.trace(&Ray { origin: hit.position + sample_world * 0.001, direction: sample_world }, hit.position, bounces - 1);
 
-            let incoming_radiance = incoming.1;
-            let distance = incoming.0;
             let cos_theta = hit.normal.dot(sample_world).max(0.0);
-            let attenuation = 1.0;
-            let radiance = incoming_radiance * attenuation;
+            let radiance = incoming.1;
 
             let light_dir = sample_world.normalize();
             let halfway = (light_dir + view_dir).normalize();
 
-            let fresnel = Self::fresnel_schlick(halfway.dot(view_dir).max(0.0), f0);
-
-            let specular_part = fresnel;
-            let mut diffuse_part = Vector3::new(1.0, 1.0, 1.0) - specular_part;
-
-            diffuse_part *= 1.0 - material_metalness;
-
+            let F = Self::fresnel_schlick(halfway.dot(view_dir).max(0.0), f0);
             let D = Self::ggx_distribution(hit.normal, halfway, material_roughness);
             let G = Self::geometry_smith(hit.normal, view_dir, sample_world, material_roughness);
 
-            let nominator = D * G.min(1.0) * fresnel;
+            let nominator = D * G * F;
             let denominator = 4.0 * hit.normal.dot(view_dir).max(0.0) * cos_theta + 0.001;
             let specular = nominator / denominator;
 
@@ -347,7 +336,7 @@ impl<'a> Raytracer<'a> {
         }
         total_indirect_specular /= N as F;
 
-        return (closest.0, (total + total_indirect_diffuse + total_indirect_specular));
+        return (closest.0, (total + total_indirect_specular + total_indirect_diffuse));
     }
 
     fn ggx_distribution(n: Vector3<F>, h: Vector3<F>, roughness: F) -> F {
