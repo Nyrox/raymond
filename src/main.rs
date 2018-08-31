@@ -33,7 +33,7 @@ fn main() {
         Vector3::new(1.0, 0.00, 0.00), 0.6
     )}));
     scene.objects.push(Object::Sphere(Sphere { origin: Vector3::new(-1.25, -0.25, 3.5), radius: 0.75, material: Material::Metal(
-        Vector3::new(0.0, 0.25, 1.00), 0.08
+        Vector3::new(0.0, 0.25, 1.00), 0.02
     )}));
     scene.objects.push(Object::Sphere(Sphere { origin: Vector3::new(-0.1, -0.65, 2.2), radius: 0.35, material: Material::Metal(
         Vector3::new(1.0, 1.0, 0.0), 0.4,
@@ -72,7 +72,7 @@ fn main() {
         .with_canvas(WIDTH, HEIGHT)
         .with_camera_fov(55.0)
         .with_bounces(2)
-        .with_samples(24)
+        .with_samples(16)
         .with_workers(None)
         .launch(scene.clone()).into_iter().map(|p| p.into()).collect();
 

@@ -341,7 +341,7 @@ impl<'a> Raytracer<'a> {
                 let a = material_roughness * material_roughness;
                 let numerator = 2.0 *  a*a * theta.cos() * theta.sin();
                 let denumerator = ((a*a - 1.0) * theta.cos()*theta.cos() + 1.0).powf(2.0);
-                (numerator / denumerator) / (4.0 * halfway.dot(view_dir).max(0.0))
+                (D * hit.normal.dot(halfway).max(0.0)) / (4.0 * halfway.dot(view_dir).max(0.0)) + 0.0001
             };
             total_indirect_specular += output / pdf;
         }
