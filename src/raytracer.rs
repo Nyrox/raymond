@@ -33,6 +33,7 @@ pub struct RaytracerConfig {
     pub width: usize,
     pub height: usize,
     pub fov: F,
+    pub camera_pos: Vector3<F>,
 }
 
 use num_cpus;
@@ -44,6 +45,7 @@ impl RaytracerConfig {
             num_samples: 16,
             width: 0,
             height: 0,
+            camera_pos: Vector3::new(0.0, 0.0, 0.0),
             fov: 65.0,
         }
     }
@@ -65,6 +67,11 @@ impl RaytracerBuilder {
             Some(t) => t,
             None => num_cpus::get(),
         };
+        return self;
+    }
+
+    pub fn with_camera_pos(mut self, v: Vector3<F>) -> Self {
+        self.config.camera_pos = v;
         return self;
     }
 
@@ -95,19 +102,23 @@ impl RaytracerBuilder {
 
         let image = RwLock::new(vec![Vector3::new(0.0, 0.0, 0.0); self.config.width * self.config.height]);
 
+        
         for i in 0..THREAD_COUNT {
             let raytracer = Raytracer { 
                 config: self.config.clone(),
                 scene: scene.clone(),
                 image: &image,
             };
+            // let result = raytracer.trace(&raytracer.generate_primary_ray(self.config.width / 2 - 30, 50), Vector3::new(0.0, 0.0, 0.0), raytracer.config.num_bounces).1;
+            // println!("Result: {:?}", result);
+            // panic!();
             unsafe {
                 thread_handles.push(crossbeam_utils::thread::spawn_unchecked(move || {
                     let start = raytracer.config.height / THREAD_COUNT * i;
                     for y in start..(start + raytracer.config.height / THREAD_COUNT) {
                         for x in 0..raytracer.config.width {
                             let ray = raytracer.generate_primary_ray(x, y);
-                            let result = raytracer.trace(&ray, Vector3::new(0.0, 0.0, 0.0), raytracer.config.num_bounces).1;
+                            let result = raytracer.trace(&ray, raytracer.config.camera_pos, raytracer.config.num_bounces).1;
                             raytracer.image.write().unwrap()[x + y * raytracer.config.width] = result;
                         }
 
@@ -196,6 +207,7 @@ impl<'a> Raytracer<'a> {
             match object.check_ray(ray) {
                 Some(hit) => { 
                     let distance = ray.origin.distance(hit.position);
+                    if distance < 0.0 { continue; }
                     if distance < closest.0 {
                         closest = (distance, i, hit);
                     }
@@ -209,6 +221,7 @@ impl<'a> Raytracer<'a> {
         let scene = &self.scene;
         let object = &scene.objects[closest.1];
         let hit = closest.2;
+
 
         let mut total = Vector3::new(0.0, 0.0, 0.0);
         
@@ -250,6 +263,8 @@ impl<'a> Raytracer<'a> {
 
         if bounces == 0 { return (closest.0, total.mul_element_wise(*material_color)); }
 
+        
+
         // Indirect lighting
         let N = self.config.num_samples;
 
@@ -266,7 +281,7 @@ impl<'a> Raytracer<'a> {
             let sample = self.uniform_sample_hemisphere();
             let sample_world = (local_cartesian_transform * sample).normalize();
 
-            let incoming = self.trace(&Ray { origin: hit.position + sample_world * 0.001, direction: sample_world }, hit.position, bounces - 1);
+            let incoming = self.trace(&Ray { origin: hit.position + sample_world * 0.01, direction: sample_world }, hit.position, bounces - 1);
 
             let incoming_radiance = incoming.1;
             let cos_theta = hit.normal.dot(sample_world).max(0.0);
@@ -307,7 +322,7 @@ impl<'a> Raytracer<'a> {
 
             let sample_world = (tangent * h.x + bitangent * h.y + reflect * h.z).normalize();
 
-            let incoming = self.trace(&Ray { origin: hit.position + sample_world * 0.001, direction: sample_world }, hit.position, bounces - 1);
+            let incoming = self.trace(&Ray { origin: hit.position + sample_world * 0.01, direction: sample_world }, hit.position, bounces - 1);
 
             let cos_theta = hit.normal.dot(sample_world).max(0.0);
             let radiance = incoming.1;
@@ -406,6 +421,6 @@ impl<'a> Raytracer<'a> {
         let px = (2.0 * ((x + 0.5) / width) - 1.0) * F::tan(self.config.fov / 2.0 * PI / 180.0) * aspect;
         let py = (1.0 - 2.0 * ((y + 0.5) / height)) * F::tan(self.config.fov / 2.0 * PI / 180.0);
 
-        Ray::new(Vector3::new(0.0, 0.0, 0.0), Vector3::new(px, py, 1.0).normalize())
+        Ray::new(self.config.camera_pos, Vector3::new(px, py, 1.0).normalize())
     }
 }
