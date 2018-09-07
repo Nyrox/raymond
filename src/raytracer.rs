@@ -14,10 +14,13 @@ use std::sync::Mutex;
 use std::sync::Arc;
 use std::sync::RwLock;
 use std::marker;
+use std::f64;
 
 static LINE_COUNT: AtomicUsize = ATOMIC_USIZE_INIT;
 
 type F = f64;
+const F_MAX: F = f64::MAX;
+
 const PI: F = 3.141592;
 
 
@@ -118,7 +121,7 @@ impl RaytracerBuilder {
                     for y in start..(start + raytracer.config.height / THREAD_COUNT) {
                         for x in 0..raytracer.config.width {
                             let ray = raytracer.generate_primary_ray(x, y);
-                            let result = raytracer.trace(&ray, raytracer.config.camera_pos, raytracer.config.num_bounces).1;
+                            let result = raytracer.trace(ray, raytracer.config.camera_pos, raytracer.config.num_bounces);
                             raytracer.image.write().unwrap()[x + y * raytracer.config.width] = result;
                         }
 
@@ -157,22 +160,12 @@ impl RaytracerBuilder {
     }
 }
 
+#[derive(Clone, Copy, Debug)]
 pub struct Ray {
     pub origin: Vector3<F>,
     pub direction: Vector3<F>,
 }
 
-#[derive(Debug)]
-pub struct Hit {
-    pub position: Vector3<F>,
-    pub normal: Vector3<F>,
-}
-
-impl Default for Hit {
-    fn default() -> Hit {
-        Hit { position: Vector3::new(0.0, 0.0, 0.0), normal: Vector3::new(0.0, 0.0, 0.0) }
-    }
-}
 impl Ray {
     pub fn new (origin: Vector3<F>, direction: Vector3<F>) -> Ray {
         Ray { origin, direction }
@@ -198,35 +191,46 @@ unsafe impl<'a> marker::Send for Raytracer<'a> {}
 unsafe impl<'a> marker::Sync for Raytracer<'a> {}
 
 impl<'a> Raytracer<'a> {
-    fn trace(&self, ray: &Ray, camera_pos: Vector3<F>, bounces: usize) -> (F, Vector3<F>) {
-        // super::TRACE_COUNT.fetch_add(1, Ordering::Relaxed);
-
-        let mut closest: (F, usize, Hit) = (123125.0, 12958125, Hit::default());
+    fn intersect(&self, ray: Ray) -> Option<(&Object, Hit)> {
+        let mut closest_distance = F_MAX;
+        let mut closest_object = None;
 
         for (i, object) in self.scene.objects.iter().enumerate() {
-            match object.check_ray(ray) {
-                Some(hit) => { 
-                    let distance = ray.origin.distance(hit.position);
-                    if distance < 0.0 { continue; }
-                    if distance < closest.0 {
-                        closest = (distance, i, hit);
+            match object.intersects(ray) {
+                Some(hit) => {
+                    if hit.distance < closest_distance {
+                        closest_distance = hit.distance;
+                        closest_object = Some((i, hit));
                     }
                 }
-                None => continue,
+                None => ()
             }
         }
 
-        if closest.1 == 12958125 { return (0.001, Vector3::new(0.0, 0.0, 0.0)) };
+        match closest_object {
+            Some((o, h)) => return Some((&self.scene.objects[o], h)),
+            _ => return None
+        }
+    }
+
+    fn trace(&self, ray: Ray, camera_pos: Vector3<F>, bounces: usize) -> Vector3<F> {
+        // super::TRACE_COUNT.fetch_add(1, Ordering::Relaxed);
         
         let scene = &self.scene;
-        let object = &scene.objects[closest.1];
-        let hit = closest.2;
+        let intersect = self.intersect(ray);
 
+        let (object, hit);
+        match intersect {
+            Some((o, h)) => { object = o; hit = h; }
+            None => return Vector3::new(0.0, 0.0, 0.0)
+        }
 
-        let mut total = Vector3::new(0.0, 0.0, 0.0);
-        
+        let surface_properties = object.get_surface_properties(hit);
+        let normal = surface_properties.normal;
+        let fragment_position = ray.origin + ray.direction * hit.distance;
+
         match object.get_material() {
-            Material::Emission(intensity) => { return (closest.0, *intensity); },
+            Material::Emission(intensity) => { return *intensity; },
             _ => {}
         }
         let (material_color, material_roughness, material_metalness) = match object.get_material() {
@@ -235,45 +239,18 @@ impl<'a> Raytracer<'a> {
             _ => panic!()
         };
 
-        // Direct lighting
-        'light_iter: for light in scene.lights.iter() {
-            // Shadow
-            let now = Instant::now();
-
-            for (index, shadow_object) in scene.objects.iter().enumerate() {
-                if closest.1 == index { continue; }
-                super::SHADOW_RAY_COUNT.fetch_add(1, Ordering::Relaxed);
-
-                let shadow_hit = shadow_object.check_ray(&Ray { origin: light.position, direction: (hit.position - light.position).normalize() });
-                if let Some(shadow_hit) = shadow_hit {
-                    if shadow_hit.position.distance(light.position) < light.position.distance(hit.position) {
-                        continue 'light_iter;
-                    }
-                }
-            }
-
-            super::SHADOW_TOTAL_TIME.fetch_add((Instant::now() - now).as_nanos() as usize, Ordering::Relaxed);
-
-            let distance = light.position.distance(hit.position);
-            let attenuation = 1.0 / (distance * distance);
-            let cos_theta = hit.normal.dot((light.position - hit.position).normalize()).max(0.0);
-            
-            total += light.intensity * cos_theta * attenuation;
-        }
-
-        if bounces == 0 { return (closest.0, total.mul_element_wise(*material_color)); }
-
-        
+        // @TODO: Implement shadow sampling
+        if bounces == 0 { return Vector3::new(0.0, 0.0, 0.0); }
 
         // Indirect lighting
         let N = self.config.num_samples;
 
         let mut total_indirect_specular = Vector3::new(0.0, 0.0, 0.0);
         let mut total_indirect_diffuse = Vector3::new(0.0, 0.0, 0.0);
-        let local_cartesian = self.create_coordinate_system_of_n(hit.normal);
-        let local_cartesian_transform = Matrix3::from_cols(local_cartesian.0, hit.normal, local_cartesian.1);
+        let local_cartesian = self.create_coordinate_system_of_n(normal);
+        let local_cartesian_transform = Matrix3::from_cols(local_cartesian.0, normal, local_cartesian.1);
         
-        let view_dir = (camera_pos - hit.position).normalize();
+        let view_dir = (camera_pos - fragment_position).normalize();
         let f0 = Vector3::new(0.04, 0.04, 0.04);
         let f0 = Self::lerp_vec(f0, *material_color, material_metalness);
 
@@ -281,10 +258,9 @@ impl<'a> Raytracer<'a> {
             let sample = self.uniform_sample_hemisphere();
             let sample_world = (local_cartesian_transform * sample).normalize();
 
-            let incoming = self.trace(&Ray { origin: hit.position + sample_world * 0.01, direction: sample_world }, hit.position, bounces - 1);
+            let incoming_radiance = self.trace(Ray { origin: fragment_position + sample_world * 0.01, direction: sample_world }, fragment_position, bounces - 1);
 
-            let incoming_radiance = incoming.1;
-            let cos_theta = hit.normal.dot(sample_world).max(0.0);
+            let cos_theta = normal.dot(sample_world).max(0.0);
             let radiance = incoming_radiance;
 
             let light_dir = sample_world.normalize();
@@ -311,9 +287,9 @@ impl<'a> Raytracer<'a> {
                 let phi: F = 2.0 * PI * rand::random::<F>();
 
                 ((phi, theta), 0.0)
-            })(hit.normal, material_roughness);
+            })(normal, material_roughness);
 
-            let reflect = 2.0 * view_dir.dot(hit.normal).max(0.0) * hit.normal - view_dir;
+            let reflect = 2.0 * view_dir.dot(normal).max(0.0) * normal - view_dir;
             let reflect = reflect.normalize();
             let h = Vector3::new(phi.cos() * theta.sin(), phi.sin() * theta.sin(), theta.cos()).normalize();
             let up = if reflect.z.abs() < 0.999 { Vector3::new(0.0, 0.0, 1.0) } else { Vector3::new(1.0, 0.0, 0.0) };
@@ -322,20 +298,19 @@ impl<'a> Raytracer<'a> {
 
             let sample_world = (tangent * h.x + bitangent * h.y + reflect * h.z).normalize();
 
-            let incoming = self.trace(&Ray { origin: hit.position + sample_world * 0.01, direction: sample_world }, hit.position, bounces - 1);
+            let radiance = self.trace(Ray { origin: fragment_position + sample_world * 0.01, direction: sample_world }, fragment_position, bounces - 1);
 
-            let cos_theta = hit.normal.dot(sample_world).max(0.0);
-            let radiance = incoming.1;
+            let cos_theta = normal.dot(sample_world).max(0.0);
 
             let light_dir = sample_world.normalize();
             let halfway = (light_dir + view_dir).normalize();
 
             let F = Self::fresnel_schlick(halfway.dot(view_dir).max(0.0), f0);
-            let D = Self::ggx_distribution(hit.normal, halfway, material_roughness);
-            let G = Self::geometry_smith(hit.normal, view_dir, sample_world, material_roughness);
+            let D = Self::ggx_distribution(normal, halfway, material_roughness);
+            let G = Self::geometry_smith(normal, view_dir, sample_world, material_roughness);
 
             let nominator = D * G * F;
-            let denominator = 4.0 * hit.normal.dot(view_dir).max(0.0) * cos_theta + 0.001;
+            let denominator = 4.0 * normal.dot(view_dir).max(0.0) * cos_theta + 0.001;
             let specular = nominator / denominator;
 
             let output = (specular).mul_element_wise(radiance) * cos_theta;
@@ -345,13 +320,13 @@ impl<'a> Raytracer<'a> {
                 let a = material_roughness * material_roughness;
                 let numerator = 2.0 *  a*a * theta.cos() * theta.sin();
                 let denumerator = ((a*a - 1.0) * theta.cos()*theta.cos() + 1.0).powf(2.0);
-                (D * hit.normal.dot(halfway).max(0.0)) / (4.0 * halfway.dot(view_dir).max(0.0)) + 0.0001
+                (D * normal.dot(halfway).max(0.0)) / (4.0 * halfway.dot(view_dir).max(0.0)) + 0.0001
             };
             total_indirect_specular += output / pdf;
         }
         total_indirect_specular /= N as F;
 
-        return (closest.0, (total + total_indirect_specular + total_indirect_diffuse));
+        return (total_indirect_specular + total_indirect_diffuse);
     }
 
     fn ggx_distribution(n: Vector3<F>, h: Vector3<F>, roughness: F) -> F {

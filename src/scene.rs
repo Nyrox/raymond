@@ -1,8 +1,26 @@
 use cgmath::*;
 use cgmath::prelude::*;
-use raytracer::{Ray, Hit};
+use raytracer::{Ray};
 
 type F = f64;
+const F_MAX: F = ::std::f64::MAX;
+
+#[derive(Clone, Copy, Debug)]
+pub struct Hit {
+    pub distance: F,
+    pub ray: Ray,
+    pub subobject_index: usize,
+}
+
+impl Hit {
+    pub fn new(ray: Ray, distance: F) -> Hit {
+        Hit { ray, distance, subobject_index: 0 }
+    }
+
+    pub fn with_child(ray: Ray, distance: F, subobject_index: usize) -> Hit {
+        Hit { ray, distance, subobject_index }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub enum Material {
@@ -11,12 +29,16 @@ pub enum Material {
     Emission(Vector3<F>),
 }
 
+#[derive(Clone, Debug)]
+pub struct SurfaceProperties {
+    pub normal: Vector3<F>
+}
+
 #[derive(Clone)]
 pub enum Object {
     Plane(Plane),
     Sphere(Sphere),
     Model(Model),
-    Box(Box),
 }
 
 impl Object {
@@ -25,16 +47,22 @@ impl Object {
             &Object::Plane(ref p) => &p.material,
             &Object::Sphere(ref s) => &s.material,
             &Object::Model(ref m) => &m.material,
-            &Object::Box(ref b) => &b.material,
         }
     }
 
-    pub fn check_ray(&self, ray: &Ray) -> Option<Hit> {
+    pub fn intersects(&self, ray: Ray) -> Option<Hit> {
+         match self {
+            &Object::Plane(ref p) => p.intersects(ray),
+            &Object::Sphere(ref s) => s.intersects(ray),
+            &Object::Model(ref m) => m.intersects(ray),
+        }
+    }
+
+    pub fn get_surface_properties(&self, hit: Hit) -> SurfaceProperties {
         match self {
-            &Object::Plane(ref p) => p.check_ray(ray),
-            &Object::Sphere(ref s) => s.check_ray(ray),
-            &Object::Model(ref m) => m.check_ray(ray),
-            &Object::Box(ref b) => b.check_ray(ray),
+            &Object::Plane(ref p) => p.get_surface_properties(hit),
+            &Object::Sphere(ref s) => s.get_surface_properties(hit),
+            &Object::Model(ref m) => m.get_surface_properties(hit),
         }
     }
 }
@@ -50,8 +78,11 @@ pub struct Model {
 }
 
 impl Model {
-    pub fn check_ray(&self, ray: &Ray) -> Option<Hit> {
-        self.mesh.check_ray(ray)
+    pub fn intersects(&self, ray: Ray) -> Option<Hit> {
+        self.mesh.intersects(ray)
+    }
+    pub fn get_surface_properties(&self, hit: Hit) -> SurfaceProperties {
+        self.mesh.get_surface_properties(hit)
     }
 }
 
@@ -90,7 +121,7 @@ pub struct AABB {
 use std::mem;
 
 impl AABB {
-    pub fn check_ray(&self, ray: &Ray) -> Option<Hit> {
+    pub fn intersects(&self, ray: Ray) -> Option<Hit> {
         let inverse_ray_dir = 1.0 / ray.direction;
         let mut t1 = (self.min[0] - ray.origin[0]) * inverse_ray_dir[0];
         let mut t2 = (self.max[0] - ray.origin[0]) * inverse_ray_dir[0];
@@ -107,63 +138,15 @@ impl AABB {
         }
 
         if !(tmax > tmin.max(0.0)) { return None; }
-
-        let position = ray.origin + ray.direction * tmin;
-        let c = (self.min + self.max) * 0.5;
-        let p = position - c;
-        let d = (self.min - self.max) * 0.5;
-        let bias = 1.0001;
-        let normal = Vector3::new(
-            (p.x / d.x.abs() * bias) as i64 as f64,
-            (p.y / d.y.abs() * bias) as i64 as f64,
-            (p.z / d.z.abs() * bias) as i64 as f64,
-        ).normalize();
         
-        return Some(Hit {
-            position,
-            normal
-        })
-    }
-}
-
-#[derive(Clone)]
-pub struct Box {
-    position: Vector3<F>,
-    size: Vector3<F>,
-    aabb: AABB,
-    pub material: Material,
-}
-
-impl Box {
-    pub fn rebuild_aabb(&mut self) {
-        self.aabb.min = self.position;
-        self.aabb.max = self.position + self.size;
-    }
-
-    pub fn get_position(&self) -> Vector3<F> { self.position }
-    pub fn get_size(&self) -> Vector3<F> { self.size }
-
-    pub fn set_position(&mut self, pos: Vector3<F>) { self.position = pos; self.rebuild_aabb(); }
-    pub fn set_size(&mut self, size: Vector3<F>) { self.size = size; self.rebuild_aabb(); }
-
-    pub fn new(position: Vector3<F>, size: Vector3<F>, material: Material) -> Self {
-        let aabb = AABB { min: position, max: position + size };
-        Box { position, size, aabb, material }
-    }
-
-    pub fn new_centered(center: Vector3<F>, size: Vector3<F>, material: Material) -> Self {
-        Self::new(center - (size / 2.0), size, material)
-    }
-
-    pub fn check_ray(&self, ray: &Ray) -> Option<Hit> {
-        return self.aabb.check_ray(ray);
+        return Some(Hit::new(ray, tmin));
     }
 }
 
 pub struct Triangle(Vertex, Vertex, Vertex);
 
 impl Triangle {
-    pub fn intersects(&self, ray: &Ray) -> Option<Hit> {
+    pub fn intersects(&self, ray: Ray) -> Option<Hit> {
         const EPSILON: F = 0.00000001;
 
         let (vertex0, vertex1, vertex2) = 
@@ -187,40 +170,38 @@ impl Triangle {
 
         let t = f * edge2.dot(q);
         if t > EPSILON {
-            let position = ray.origin + ray.direction * t;
-            
-            // Calculate normals
-            fn area(a: Vector3<F>, b: Vector3<F>, c: Vector3<F>) -> F {
-                let ab = a.distance(b);
-                let ac = a.distance(c);
-                let bc = b.distance(c);
-
-                let s = (ab + ac + bc) / 2.0;
-                return (
-                    s * (s - ab) * (s - ac) * (s - bc)
-                ).sqrt();
-            }
-
-            let abc = area(self.0.position, self.1.position, self.2.position);
-            let abp = area(self.0.position, self.1.position, position);
-            let bcp = area(self.0.position, self.2.position, position);
-
-            let ba = abp / abc;
-            let bb = bcp / abc;
-            let bc = 1.0 - (ba + bb);
-
-            let normal = 
-                (self.2.normal * ba) +
-                (self.1.normal * bb) + 
-                (self.0.normal * bc);
-
-            return Some(Hit {
-                position,
-                normal
-            });
+            return Some(Hit::new(ray, t));
         }
 
         return None;
+    }
+
+    pub fn get_surface_properties(&self, hit: Hit) -> SurfaceProperties {
+        fn area(a: Vector3<F>, b: Vector3<F>, c: Vector3<F>) -> F {
+            let ab = a.distance(b);
+            let ac = a.distance(c);
+            let bc = b.distance(c);
+            let s = (ab + ac + bc) / 2.0;
+            return (
+                s * (s - ab) * (s - ac) * (s - bc)
+            ).sqrt();
+        }
+
+        let position = hit.ray.origin + hit.ray.direction * hit.distance;
+        let abc = area(self.0.position, self.1.position, self.2.position);
+        let abp = area(self.0.position, self.1.position, position);
+        let bcp = area(self.0.position, self.2.position, position);
+        let ba = abp / abc;
+        let bb = bcp / abc;
+        let bc = 1.0 - (ba + bb);
+        let normal = 
+            (self.2.normal * ba) +
+            (self.1.normal * bb) + 
+            (self.0.normal * bc);
+
+        return SurfaceProperties {
+            normal
+        };
     }
 }
 
@@ -234,26 +215,29 @@ impl Mesh {
         Mesh { bounding_box: Self::find_mesh_bounds(&triangles), triangles}
     }
 
-    pub fn check_ray(&self, ray: &Ray) -> Option<Hit> {
-        self.bounding_box.check_ray(ray)?;
-        let mut closest = 12512512.0;
-        let mut closest_hit = Hit { position: Vector3::new(0.0, 0.0, 0.0), normal: Vector3::new(0.0, 0.0, 0.0) };
-        let mut hit = false;
+    pub fn intersects(&self, ray: Ray) -> Option<Hit> {
+        self.bounding_box.intersects(ray)?;
+        let mut closest = F_MAX;
+        let mut closest_hit = None;
 
-        for tri in self.triangles.iter() {
+        for (i, tri) in self.triangles.iter().enumerate() {
             match tri.intersects(ray) {
                 Some(h) => { 
-                    hit = true;
-                    if h.position.distance(ray.origin) < closest  {
-                        closest = h.position.distance(ray.origin);
-                        closest_hit = h;
+                    let distance = h.distance;
+                    if distance < closest {
+                        closest = distance;
+                        closest_hit = Some(Hit::with_child(ray, closest, i));
                     }
                 }
                 None => {}
             }
         }
 
-        if hit { Some(closest_hit) } else { None }
+        closest_hit
+    }
+
+    pub fn get_surface_properties(&self, hit: Hit) -> SurfaceProperties {
+        self.triangles[hit.subobject_index].get_surface_properties(hit)
     }
 
     pub fn bake_transform(&mut self, translate: Vector3<F>) {
@@ -359,11 +343,11 @@ pub struct Plane {
 }
 
 impl Plane {
-    fn get_material(&self) -> Material {
+    pub fn get_material(&self) -> Material {
         self.material.clone()
     }
 
-    fn check_ray(&self, ray: &Ray) -> Option<Hit> {
+    pub fn intersects(&self, ray: Ray) -> Option<Hit> {
         let normal = self.normal;
 
         let denom = normal.dot(-ray.direction);
@@ -371,12 +355,17 @@ impl Plane {
             let p0l0 = self.origin - ray.origin;
             let t = p0l0.dot(-normal) / denom;
             if t >= 0.0 {
-                let hit_pos = ray.origin + ray.direction * t;
-                return Some(Hit { position: hit_pos, normal });
+                return Some(Hit::new(ray, t));
             }
         }
 
         return None;
+    }
+
+    pub fn get_surface_properties(&self, hit: Hit) -> SurfaceProperties {
+        SurfaceProperties {
+            normal: self.normal
+        }
     }
 }
 
@@ -392,7 +381,7 @@ impl Sphere {
         self.material.clone()
     }
     
-    fn check_ray(&self, ray: &Ray) -> Option<Hit> {
+    fn intersects(&self, ray: Ray) -> Option<Hit> {
         let c = self.origin - ray.origin;
         let mut t = c.dot(ray.direction);
         let q = c - t * ray.direction;
@@ -406,7 +395,13 @@ impl Sphere {
         if t <= 0.0 { return None; }
         
         let hit_pos = ray.origin + ray.direction * t;
-        return Some(Hit { position: hit_pos, normal: (hit_pos - self.origin).normalize() });
+        return Some(Hit::new(ray, t));
+    }
+
+    pub fn get_surface_properties(&self, hit: Hit) -> SurfaceProperties {
+        SurfaceProperties {
+            normal: ((hit.ray.origin + hit.ray.direction * hit.distance) - self.origin).normalize()
+        }
     }
 }
 
