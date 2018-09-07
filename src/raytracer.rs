@@ -31,7 +31,7 @@ pub fn build() -> RaytracerBuilder {
 #[derive(Clone, Debug)]
 pub struct RaytracerConfig {
     pub num_workers: usize,
-    pub num_bounces: usize,
+    pub max_bounces: usize,
     pub num_samples: usize,
     pub width: usize,
     pub height: usize,
@@ -44,7 +44,7 @@ impl RaytracerConfig {
     pub fn new() -> Self {
         RaytracerConfig {
             num_workers: num_cpus::get(),
-            num_bounces: 2,
+            max_bounces: 4,
             num_samples: 16,
             width: 0,
             height: 0,
@@ -78,8 +78,8 @@ impl RaytracerBuilder {
         return self;
     }
 
-    pub fn with_bounces(mut self, b: usize) -> Self {
-        self.config.num_bounces = b;
+    pub fn with_max_bounces(mut self, b: usize) -> Self {
+        self.config.max_bounces = b;
         return self;
     }
 
@@ -121,7 +121,7 @@ impl RaytracerBuilder {
                     for y in start..(start + raytracer.config.height / THREAD_COUNT) {
                         for x in 0..raytracer.config.width {
                             let ray = raytracer.generate_primary_ray(x, y);
-                            let result = raytracer.trace(ray, raytracer.config.camera_pos, raytracer.config.num_bounces);
+                            let result = raytracer.trace(ray, raytracer.config.camera_pos, 1);
                             raytracer.image.write().unwrap()[x + y * raytracer.config.width] = result;
                         }
 
@@ -213,9 +213,10 @@ impl<'a> Raytracer<'a> {
         }
     }
 
-    fn trace(&self, ray: Ray, camera_pos: Vector3<F>, bounces: usize) -> Vector3<F> {
-        // super::TRACE_COUNT.fetch_add(1, Ordering::Relaxed);
+    fn trace(&self, ray: Ray, camera_pos: Vector3<F>, depth: usize) -> Vector3<F> {
+
         
+        // super::TRACE_COUNT.fetch_add(1, Ordering::Relaxed);
         let scene = &self.scene;
         let intersect = self.intersect(ray);
 
@@ -239,12 +240,22 @@ impl<'a> Raytracer<'a> {
             _ => panic!()
         };
 
-        // @TODO: Implement shadow sampling
-        if bounces == 0 { return Vector3::new(0.0, 0.0, 0.0); }
+        if depth > self.config.max_bounces {
+            return Vector3::new(0.0, 0.0, 0.0);
+        }
 
-        // Indirect lighting
-        let N = self.config.num_samples;
+        let samples = ((self.config.num_samples as f64) / ((depth + 1) as f64).log2());
+        let mut diffuse_samples = samples / 2.0;
+        let mut specular_samples = diffuse_samples;
 
+        specular_samples += diffuse_samples * material_metalness;
+        diffuse_samples -= diffuse_samples * material_metalness;
+
+        let specular_samples = specular_samples.round() as isize;
+        let diffuse_samples = diffuse_samples.round() as isize;
+        
+        // println!("{:?}, {:?}, {}", diffuse_samples, specular_samples, material_metalness);
+        
         let mut total_indirect_specular = Vector3::new(0.0, 0.0, 0.0);
         let mut total_indirect_diffuse = Vector3::new(0.0, 0.0, 0.0);
         let local_cartesian = self.create_coordinate_system_of_n(normal);
@@ -254,11 +265,11 @@ impl<'a> Raytracer<'a> {
         let f0 = Vector3::new(0.04, 0.04, 0.04);
         let f0 = Self::lerp_vec(f0, *material_color, material_metalness);
 
-        for i in 0..N {
+        for i in 0..diffuse_samples {
             let sample = self.uniform_sample_hemisphere();
             let sample_world = (local_cartesian_transform * sample).normalize();
 
-            let incoming_radiance = self.trace(Ray { origin: fragment_position + sample_world * 0.01, direction: sample_world }, fragment_position, bounces - 1);
+            let incoming_radiance = self.trace(Ray { origin: fragment_position + sample_world * 0.01, direction: sample_world }, fragment_position, depth + 1);
 
             let cos_theta = normal.dot(sample_world).max(0.0);
             let radiance = incoming_radiance;
@@ -277,9 +288,9 @@ impl<'a> Raytracer<'a> {
 
             total_indirect_diffuse += output;
         }
-        total_indirect_diffuse /= N as F * (1.0 / (2.0 * PI));
+        total_indirect_diffuse /= (diffuse_samples as F + 0.0001) * (1.0 / (2.0 * PI));
 
-        for i in 0..N {
+        for i in 0..specular_samples {
             // importance sampling
             let ((phi, theta), pdf) = (|n: Vector3<F>, r: F| {
                 let rand_theta: F = rand::random();
@@ -298,7 +309,7 @@ impl<'a> Raytracer<'a> {
 
             let sample_world = (tangent * h.x + bitangent * h.y + reflect * h.z).normalize();
 
-            let radiance = self.trace(Ray { origin: fragment_position + sample_world * 0.01, direction: sample_world }, fragment_position, bounces - 1);
+            let radiance = self.trace(Ray { origin: fragment_position + sample_world * 0.01, direction: sample_world }, fragment_position, depth + 1);
 
             let cos_theta = normal.dot(sample_world).max(0.0);
 
@@ -324,7 +335,7 @@ impl<'a> Raytracer<'a> {
             };
             total_indirect_specular += output / pdf;
         }
-        total_indirect_specular /= N as F;
+        total_indirect_specular /= (specular_samples as F + 0.00001);
 
         return (total_indirect_specular + total_indirect_diffuse);
     }
