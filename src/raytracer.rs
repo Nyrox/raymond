@@ -263,8 +263,6 @@ impl<'a> Raytracer<'a> {
 
         if bounces == 0 { return (closest.0, total.mul_element_wise(*material_color)); }
 
-        
-
         // Indirect lighting
         let N = self.config.num_samples;
 

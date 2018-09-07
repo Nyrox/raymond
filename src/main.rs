@@ -11,6 +11,8 @@ extern crate num_cpus;
 
 pub mod raytracer;
 pub mod scene;
+pub mod acc_grid;
+
 use scene::*;
 use raytracer::*;
 use cgmath::Vector3;
@@ -31,20 +33,26 @@ fn main() {
     let now = Instant::now();
 
     let mut scene = Scene::new();
-    scene.objects.push(Object::Sphere(Sphere { origin: Vector3::new(-1.5, -0.5, 2.5), radius: 0.5, material: Material::Diffuse(
+    scene.objects.push(Object::Sphere(Sphere { origin: Vector3::new(-1.5, -0.5, 3.5), radius: 0.5, material: Material::Diffuse(
         Vector3::new(1.0, 0.00, 0.00), 0.04
     )}));
     scene.objects.push(Object::Sphere(Sphere { origin: Vector3::new(1.25, -0.25, 3.5), radius: 0.75, material: Material::Metal(
         Vector3::new(0.05, 0.25, 1.00), 0.02
     )}));
 
-    let mut cube_mesh = Mesh::load_ply(PathBuf::from("assets/meshes/suzanne.ply"));
-    cube_mesh.bake_transform(Vector3::new(-0.0, 0.0, 2.9));
-    let mut cube_mesh = Arc::new(cube_mesh);
-    
-    let cube_model = Object::Model(Model { mesh: cube_mesh, material: Material::Metal(
+    let mut cube_mesh = Mesh::load_ply(PathBuf::from("assets/meshes/ico_sphere.ply"));
+    cube_mesh.bake_transform(Vector3::new(0.0, 0.0, 2.9));
+    // let mut cube_mesh = Arc::new(cube_mesh);
+    let mut cube_grid = acc_grid::AccGrid::build_from_mesh(cube_mesh);
+    // let hit = cube_grid.intersects(&Ray { origin: Vector3::new(0.0, 0.0, 0.0), direction: Vector3::new(0.0, 0.0, 1.0) });
+    // println!("{:?}", hit);
+    // panic!();
+    // cube_grid.intersects(&Ray { origin: Vector3::new(0.0, 0.0, 0.0), direction: Vector3::new(0.0, 0.0, 1.0) });
+
+    let cube_grid = Arc::new(cube_grid);
+    let cube_model = Object::Grid(cube_grid, Material::Metal(
         Vector3::new(1.0, 1.0, 0.1), 0.11
-    )});
+    ));
 
     scene.objects.push(cube_model);
 

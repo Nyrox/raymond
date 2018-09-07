@@ -1,6 +1,7 @@
 use cgmath::*;
 use cgmath::prelude::*;
 use raytracer::{Ray, Hit};
+use acc_grid;
 
 type F = f64;
 
@@ -17,6 +18,7 @@ pub enum Object {
     Sphere(Sphere),
     Model(Model),
     Box(Box),
+    Grid(Arc<acc_grid::AccGrid>, Material),
 }
 
 impl Object {
@@ -26,6 +28,7 @@ impl Object {
             &Object::Sphere(ref s) => &s.material,
             &Object::Model(ref m) => &m.material,
             &Object::Box(ref b) => &b.material,
+            &Object::Grid(ref g, ref m) => m,
         }
     }
 
@@ -35,6 +38,7 @@ impl Object {
             &Object::Sphere(ref s) => s.check_ray(ray),
             &Object::Model(ref m) => m.check_ray(ray),
             &Object::Box(ref b) => b.check_ray(ray),
+            &Object::Grid(ref g, _) => g.intersects(ray),
         }
     }
 }
@@ -160,11 +164,12 @@ impl Box {
     }
 }
 
+#[derive(Debug)]
 pub struct Triangle(Vertex, Vertex, Vertex);
 
 impl Triangle {
     pub fn intersects(&self, ray: &Ray) -> Option<Hit> {
-        const EPSILON: F = 0.00000001;
+        const EPSILON: F = 0.000001;
 
         let (vertex0, vertex1, vertex2) = 
             (self.0.position, self.1.position, self.2.position);
@@ -222,8 +227,26 @@ impl Triangle {
 
         return None;
     }
+
+    pub fn find_bounds(&self) -> AABB {
+        let mut min = Vector3::<F>::new(125125.0, 1251251.0, 12512512.0);
+        let mut max = Vector3::<F>::new(-123125.0, -125123.0, -512123.0);
+
+        for i in 0..3 {
+            min[i] = min[i].min(self.0.position[i]);
+            min[i] = min[i].min(self.1.position[i]);
+            min[i] = min[i].min(self.2.position[i]);
+            max[i] = max[i].max(self.0.position[i]);
+            max[i] = max[i].max(self.1.position[i]);
+            max[i] = max[i].max(self.2.position[i]);
+        }
+        
+        return AABB { min, max };
+    }
 }
 
+
+#[derive(Debug)]
 pub struct Mesh {
     pub triangles: Vec<Triangle>,
     pub bounding_box: AABB,
