@@ -179,7 +179,8 @@ impl Triangle {
 
         let h = ray.direction.cross(edge2);
         let a = edge1.dot(h);
-        if a < EPSILON { return None; }
+        if (a < EPSILON && a > -EPSILON) { return None; }
+
 
         let f = 1.0 / a;
         let s = ray.origin - vertex0;

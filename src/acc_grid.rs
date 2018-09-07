@@ -100,6 +100,31 @@ impl AccGrid {
         let mut t_max_z = (((current_cell.z + if ray.direction.z < 0.0 { 0 } else { 1 }) as f64 * self.cell_size.z) - start.z) / ray.direction.z;
 
         loop {
+            let (x, y, z) = (current_cell.x as usize, current_cell.y as usize, current_cell.z as usize);
+            if x + self.resolution.x * (y + z * self.resolution.z) >= self.cells.len() {
+                return None;
+            }
+
+            let cell = self.cells[x + self.resolution.x * (y + z * self.resolution.z)];
+            let count = self.mapping_table[cell.0];
+            let mut closest = 5712515.0;
+            let mut closest_hit = None;
+            for i in 1..=count {
+                let tri = &self.mesh.triangles[self.mapping_table[cell.0 + i]];
+                match tri.intersects(ray) {
+                    Some(h) => {
+                        let distance = h.position.distance(ray.origin);
+                        if distance < closest {
+                            closest = distance;
+                            closest_hit = Some(h);
+                        }
+                    }
+                    None => ()
+                }
+            }
+
+            if closest_hit.is_some() { return closest_hit; }
+
             if t_max_x < t_max_y {
                 if t_max_x < t_max_z {
                     current_cell.x += step.x;
@@ -132,32 +157,6 @@ impl AccGrid {
                     t_max_z += t_delta_z;
                 }
             }
-
-            let (x, y, z) = (current_cell.x as usize, current_cell.y as usize, current_cell.z as usize);
-            if x + self.resolution.x * (y + z * self.resolution.z) >= self.cells.len() {
-                continue;
-            }
-
-            let cell = self.cells[x + self.resolution.x * (y + z * self.resolution.z)];
-            let count = self.mapping_table[cell.0];
-            let mut closest = 5712515.0;
-            let mut closest_hit = None;
-            for i in 1..=count {
-                let tri = &self.mesh.triangles[self.mapping_table[cell.0 + i]];
-                match tri.intersects(ray) {
-                    Some(h) => {
-                // println!("{:?}", h);
-                        let distance = h.position.distance(ray.origin);
-                        if distance < closest {
-                            closest = distance;
-                            closest_hit = Some(h);
-                        }
-                    }
-                    None => ()
-                }
-            }
-
-            if closest_hit.is_some() { return closest_hit; }
         }
     }
 }
