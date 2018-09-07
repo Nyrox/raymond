@@ -40,7 +40,7 @@ fn main() {
         Vector3::new(0.05, 0.25, 1.00), 0.02
     )}));
 
-    let mut cube_mesh = Mesh::load_ply(PathBuf::from("assets/meshes/ico_sphere.ply"));
+    let mut cube_mesh = Mesh::load_ply(PathBuf::from("assets/meshes/cube.ply"));
     cube_mesh.bake_transform(Vector3::new(0.0, 0.0, 2.9));
     // let mut cube_mesh = Arc::new(cube_mesh);
     let mut cube_grid = acc_grid::AccGrid::build_from_mesh(cube_mesh);

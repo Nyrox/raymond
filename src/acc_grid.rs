@@ -44,12 +44,17 @@ impl AccGrid {
 
         for (index, tri) in mesh.triangles.iter().enumerate() {
             let bounds = tri.find_bounds();
-            let cell_min = (bounds.min - mesh.bounding_box.min).div_element_wise(cell_size).cast::<usize>().expect("Failed to cast cell bounds to usize");
-            let cell_max = (bounds.max - mesh.bounding_box.min).div_element_wise(cell_size).cast::<usize>().expect("Failed to cast cell bounds to usize");
+            let mut cell_min = (bounds.min - mesh.bounding_box.min).div_element_wise(cell_size).cast::<usize>().expect("Failed to cast cell bounds to usize");
+            let mut cell_max = (bounds.max - mesh.bounding_box.min).div_element_wise(cell_size).cast::<usize>().expect("Failed to cast cell bounds to usize");
 
-            for z in cell_min.z .. cell_max.z {
-                for y in cell_min.y .. cell_max.y {
-                    for x in cell_min.x .. cell_max.x {
+            for i in 0..3 {
+                cell_min[i] = cell_min[i].max(0).min(grid_res[i] - 1);
+                cell_max[i] = cell_max[i].max(0).min(grid_res[i] - 1);
+            }
+
+            for z in cell_min.z ..= cell_max.z {
+                for y in cell_min.y ..= cell_max.y {
+                    for x in cell_min.x ..= cell_max.x {
                         naive_cells[x + grid_res.x * (y + z * grid_res.z)].0.push(index);
                     }
                 }
@@ -95,7 +100,6 @@ impl AccGrid {
         let mut t_max_z = (((current_cell.z + if ray.direction.z < 0.0 { 0 } else { 1 }) as f64 * self.cell_size.z) - start.z) / ray.direction.z;
 
         loop {
-            println!("{:?}", current_cell);
             if t_max_x < t_max_y {
                 if t_max_x < t_max_z {
                     current_cell.x += step.x;
@@ -130,9 +134,9 @@ impl AccGrid {
             }
 
             let (x, y, z) = (current_cell.x as usize, current_cell.y as usize, current_cell.z as usize);
-            // if x + self.resolution.x * (y + z * self.resolution.z) >= self.cells.len() {
-            //     continue;
-            // }
+            if x + self.resolution.x * (y + z * self.resolution.z) >= self.cells.len() {
+                continue;
+            }
 
             let cell = self.cells[x + self.resolution.x * (y + z * self.resolution.z)];
             let count = self.mapping_table[cell.0];
