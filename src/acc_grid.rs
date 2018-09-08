@@ -91,9 +91,9 @@ impl AccGrid {
         }
         let step = Vector3::new(ray.direction.x.signum(), ray.direction.y.signum(), ray.direction.z.signum()).cast::<i32>().unwrap();
 
-        let t_delta_x = self.cell_size.x / ray.direction.x;
-        let t_delta_y = self.cell_size.y / ray.direction.y;
-        let t_delta_z = self.cell_size.z / ray.direction.z;
+        let t_delta_x = if ray.direction.x < 0.0 { -self.cell_size.x } else { self.cell_size.x } / ray.direction.x;
+        let t_delta_y = if ray.direction.y < 0.0 { -self.cell_size.y } else { self.cell_size.y } / ray.direction.y;
+        let t_delta_z = if ray.direction.z < 0.0 { -self.cell_size.z } else { self.cell_size.z } / ray.direction.z;
 
         let mut t_max_x = (((current_cell.x + if ray.direction.x < 0.0 { 0 } else { 1 }) as f64 * self.cell_size.x) - start.x) / ray.direction.x;
         let mut t_max_y = (((current_cell.y + if ray.direction.y < 0.0 { 0 } else { 1 }) as f64 * self.cell_size.y) - start.y) / ray.direction.y;

@@ -40,8 +40,8 @@ fn main() {
         Vector3::new(0.05, 0.25, 1.00), 0.02
     )}));
 
-    let mut cube_mesh = Mesh::load_ply(PathBuf::from("assets/meshes/suzanne.ply"));
-    cube_mesh.bake_transform(Vector3::new(0.0, 0.0, 2.9));
+    let mut cube_mesh = Mesh::load_ply(PathBuf::from("assets/meshes/dragon_vrip.ply"));
+    cube_mesh.bake_transform(Vector3::new(0.0, -0.4, 2.9));
     // let mut cube_mesh = Arc::new(cube_mesh);
     let mut cube_grid = acc_grid::AccGrid::build_from_mesh(cube_mesh);
     // let hit = cube_grid.intersects(&Ray { origin: Vector3::new(0.0, 0.0, 0.0), direction: Vector3::new(0.0, 0.0, 1.0) });
@@ -51,7 +51,7 @@ fn main() {
 
     let cube_grid = Arc::new(cube_grid);
     let cube_model = Object::Grid(cube_grid, Material::Metal(
-        Vector3::new(1.0, 1.0, 0.1), 0.11
+        Vector3::new(1.0, 1.0, 0.1), 0.2
     ));
 
     scene.objects.push(cube_model);
@@ -84,13 +84,13 @@ fn main() {
     
     // scene.lights.push(Light { position: Vector3::new(0.0, 1.95, 2.5), intensity: Vector3::new(0.8, 0.8, 1.0) });
     // scene.lights.push(Light { position: Vector3::new(1.75, -0.75, 1.0), intensity: Vector3::new(0.8, 1.0, 0.7) });
-    let HEIGHT = 400;
+    let HEIGHT = 480;
     let WIDTH = HEIGHT / 9 * 16;
     let final_image: Vec<[u8; 3]> = raytracer::build()
         .with_canvas(WIDTH, HEIGHT)
         .with_camera_fov(55.0)
-        .with_bounces(2)
-        .with_samples(4)
+        .with_bounces(3)
+        .with_samples(12)
         .with_workers(None)
         .with_camera_pos(Vector3::new(0.0, 0.0, -0.5))
         .launch(scene.clone()).into_iter().map(|p| p.into()).collect();

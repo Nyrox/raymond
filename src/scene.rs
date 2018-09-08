@@ -321,7 +321,7 @@ impl Mesh {
 			vertices.push(Vertex {
 				position: Vector3::new(values[0], values[1], values[2]),
 				normal: Vector3::new(values[3], values[4], values[5]),
-				uv: Vector2::new(values[6], values[7]),
+				uv: Vector2::new(*values.get(6).unwrap_or(&0.0), *values.get(7).unwrap_or(&0.0)),
 				tangent: Vector3::new(0.0, 0.0, 0.0)
 			});
 		};
