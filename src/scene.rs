@@ -1,6 +1,7 @@
 use cgmath::*;
 use cgmath::prelude::*;
 use raytracer::{Ray};
+use acc_grid;
 
 type F = f64;
 const F_MAX: F = ::std::f64::MAX;
@@ -39,6 +40,7 @@ pub enum Object {
     Plane(Plane),
     Sphere(Sphere),
     Model(Model),
+    Grid(Arc<acc_grid::AccGrid>, Material),
 }
 
 impl Object {
@@ -47,6 +49,7 @@ impl Object {
             &Object::Plane(ref p) => &p.material,
             &Object::Sphere(ref s) => &s.material,
             &Object::Model(ref m) => &m.material,
+            &Object::Grid(ref g, ref m) => m,
         }
     }
 
@@ -55,6 +58,7 @@ impl Object {
             &Object::Plane(ref p) => p.intersects(ray),
             &Object::Sphere(ref s) => s.intersects(ray),
             &Object::Model(ref m) => m.intersects(ray),
+            &Object::Grid(ref g, _) => g.intersects(ray),
         }
     }
 
@@ -63,6 +67,7 @@ impl Object {
             &Object::Plane(ref p) => p.get_surface_properties(hit),
             &Object::Sphere(ref s) => s.get_surface_properties(hit),
             &Object::Model(ref m) => m.get_surface_properties(hit),
+            &Object::Grid(ref g, _) => g.get_surface_properties(hit),
         }
     }
 }
@@ -143,6 +148,7 @@ impl AABB {
     }
 }
 
+#[derive(Debug)]
 pub struct Triangle(Vertex, Vertex, Vertex);
 
 impl Triangle {
@@ -157,7 +163,8 @@ impl Triangle {
 
         let h = ray.direction.cross(edge2);
         let a = edge1.dot(h);
-        if a < EPSILON { return None; }
+        if (a < EPSILON && a > -EPSILON) { return None; }
+
 
         let f = 1.0 / a;
         let s = ray.origin - vertex0;
@@ -203,8 +210,26 @@ impl Triangle {
             normal
         };
     }
+
+    pub fn find_bounds(&self) -> AABB {
+        let mut min = Vector3::<F>::new(125125.0, 1251251.0, 12512512.0);
+        let mut max = Vector3::<F>::new(-123125.0, -125123.0, -512123.0);
+
+        for i in 0..3 {
+            min[i] = min[i].min(self.0.position[i]);
+            min[i] = min[i].min(self.1.position[i]);
+            min[i] = min[i].min(self.2.position[i]);
+            max[i] = max[i].max(self.0.position[i]);
+            max[i] = max[i].max(self.1.position[i]);
+            max[i] = max[i].max(self.2.position[i]);
+        }
+        
+        return AABB { min, max };
+    }
 }
 
+
+#[derive(Debug)]
 pub struct Mesh {
     pub triangles: Vec<Triangle>,
     pub bounding_box: AABB,
@@ -281,7 +306,7 @@ impl Mesh {
 			vertices.push(Vertex {
 				position: Vector3::new(values[0], values[1], values[2]),
 				normal: Vector3::new(values[3], values[4], values[5]),
-				uv: Vector2::new(values[6], values[7]),
+				uv: Vector2::new(*values.get(6).unwrap_or(&0.0), *values.get(7).unwrap_or(&0.0)),
 				tangent: Vector3::new(0.0, 0.0, 0.0)
 			});
 		};

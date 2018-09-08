@@ -112,7 +112,7 @@ impl RaytracerBuilder {
                 scene: scene.clone(),
                 image: &image,
             };
-            // let result = raytracer.trace(&raytracer.generate_primary_ray(self.config.width / 2 - 30, 50), Vector3::new(0.0, 0.0, 0.0), raytracer.config.num_bounces).1;
+            // let result = raytracer.trace(&raytracer.generate_primary_ray(335, 99), Vector3::new(0.0, 0.0, 0.0), raytracer.config.num_bounces).1;
             // println!("Result: {:?}", result);
             // panic!();
             unsafe {
@@ -142,7 +142,7 @@ impl RaytracerBuilder {
             let gamma = 2.2;
             let tone_mapped = Vector3::new(1.0, 1.0, 1.0) - element_wise_map(&(p * -1.0 * exposure), |e| F::exp(e));
             let tone_mapped = element_wise_map(&tone_mapped, |x| x.powf(1.0 / gamma));
-
+      
             for i in 0..3 {
                 let e = tone_mapped[i];
                 if e > 1.0 || e < 0.0 {
@@ -290,32 +290,31 @@ impl<'a> Raytracer<'a> {
         }
         total_indirect_diffuse /= (diffuse_samples as F + 0.0001) * (1.0 / (2.0 * PI));
 
+        let reflect = (-view_dir - 2.0 * (-view_dir.dot(normal).max(0.0) * normal)).normalize();
         for i in 0..specular_samples {
-            // importance sampling
-            let ((phi, theta), pdf) = (|n: Vector3<F>, r: F| {
-                let rand_theta: F = rand::random();
-                let theta: F = (r*r * (rand_theta / (1.0 - rand_theta)).sqrt()).atan();
-                let phi: F = 2.0 * PI * rand::random::<F>();
+            fn importance_sample_ggx(reflect: Vector3<F>, roughness: F) -> Vector3<F> {
+                let r1: F = rand::random();
+                let r2: F = rand::random();
 
-                ((phi, theta), 0.0)
-            })(normal, material_roughness);
+                let a = roughness*roughness;
+                let phi = 2.0 * PI * r1;
+                let cos_theta = ((1.0 - r2) / (1.0 + (a*a - 1.0) * r2)).sqrt();
+                let sin_theta = (1.0 - cos_theta*cos_theta).sqrt();
 
-            let reflect = 2.0 * view_dir.dot(normal).max(0.0) * normal - view_dir;
-            let reflect = reflect.normalize();
-            let h = Vector3::new(phi.cos() * theta.sin(), phi.sin() * theta.sin(), theta.cos()).normalize();
-            let up = if reflect.z.abs() < 0.999 { Vector3::new(0.0, 0.0, 1.0) } else { Vector3::new(1.0, 0.0, 0.0) };
-            let tangent = up.cross(reflect).normalize();
-            let bitangent = reflect.cross(tangent).normalize();
+                let h = Vector3::new(phi.cos() * sin_theta, phi * sin_theta, cos_theta);
 
-            let sample_world = (tangent * h.x + bitangent * h.y + reflect * h.z).normalize();
+                let up = if reflect.z.abs() < 0.999 { Vector3::new(0.0, 0.0, 1.0) } else { Vector3::new(1.0, 0.0, 0.0) };
+                let tangent = up.cross(reflect).normalize();
+                let bitangent = reflect.cross(tangent);
 
+                return (tangent * h.x + bitangent * h.y + reflect * h.z).normalize();
+            }
+            let sample_world = importance_sample_ggx(reflect, material_roughness);
+            
             let radiance = self.trace(Ray { origin: fragment_position + sample_world * 0.01, direction: sample_world }, fragment_position, depth + 1);
-
-            let cos_theta = normal.dot(sample_world).max(0.0);
-
+            let cos_theta = normal.dot(sample_world).max(0.0);;
             let light_dir = sample_world.normalize();
             let halfway = (light_dir + view_dir).normalize();
-
             let F = Self::fresnel_schlick(halfway.dot(view_dir).max(0.0), f0);
             let D = Self::ggx_distribution(normal, halfway, material_roughness);
             let G = Self::geometry_smith(normal, view_dir, sample_world, material_roughness);
@@ -328,9 +327,6 @@ impl<'a> Raytracer<'a> {
 
             // pdf
             let pdf = {
-                let a = material_roughness * material_roughness;
-                let numerator = 2.0 *  a*a * theta.cos() * theta.sin();
-                let denumerator = ((a*a - 1.0) * theta.cos()*theta.cos() + 1.0).powf(2.0);
                 (D * normal.dot(halfway).max(0.0)) / (4.0 * halfway.dot(view_dir).max(0.0)) + 0.0001
             };
             total_indirect_specular += output / pdf;
@@ -346,21 +342,20 @@ impl<'a> Raytracer<'a> {
 
         let nominator = a2;
         let denominator = NdotH.powf(2.0) * (a2 - 1.0) + 1.0;
-        let denominator = PI * denominator * denominator;
+        let denominator = (PI * denominator * denominator).max(1e-7);
         return nominator / denominator;
     }
 
-    fn geometry_schlick_ggx(n: Vector3<F>, v: Vector3<F>, k: F) -> F {
-        let n_dot_v = n.dot(v).max(0.0);
+    fn geometry_schlick_ggx(n: Vector3<F>, v: Vector3<F>, r: F) -> F {
+        let numerator = n.dot(v).max(0.0);
+        let k = (r*r) / 8.0;
+        let denominator =  numerator * (1.0 - k) + k;
 
-        let nominator = n_dot_v;
-        let denominator = n_dot_v * (1.0 - k) + k;
-
-        return nominator / denominator;
+        return numerator / denominator;
     }
 
-    fn geometry_smith(n: Vector3<F>, v: Vector3<F>, l: Vector3<F>, k: F) -> F {
-        return Self::geometry_schlick_ggx(n, v, k) * Self::geometry_schlick_ggx(n, l, k);
+    fn geometry_smith(n: Vector3<F>, v: Vector3<F>, l: Vector3<F>, r: F) -> F {
+        return Self::geometry_schlick_ggx(n, v, r) * Self::geometry_schlick_ggx(n, l, r);
     }
 
     fn fresnel_schlick(cos_theta: F, F0: Vector3<F>) -> Vector3<F> {
