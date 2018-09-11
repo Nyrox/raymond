@@ -1,19 +1,12 @@
-use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT, Ordering};
-use std::time::{Duration, Instant};
-use std::sync::mpsc::channel;
-use std::thread;
-use std::sync::Mutex;
-use std::sync::Arc;
 use std::sync::RwLock;
 use std::marker;
 use std::f64;
-use std::cell::RefCell;
+use std::default::Default;
 
 use rand;
 use crossbeam_utils;
-use num_traits;
 use cgmath::*;
-use cgmath::prelude::*;
+use num_cpus;
 
 use super::scene::*;
 use super::primitives::{Ray, Hit};
@@ -21,11 +14,7 @@ use super::material::Material;
 
 use super::{F, PI, F_MAX};
 
-static LINE_COUNT: AtomicUsize = ATOMIC_USIZE_INIT;
 
-pub fn build() -> RaytracerBuilder {
-    RaytracerBuilder::new()
-}
 
 #[derive(Clone, Debug)]
 pub struct RaytracerConfig {
@@ -38,9 +27,8 @@ pub struct RaytracerConfig {
     pub camera_pos: Vector3<F>,
 }
 
-use num_cpus;
-impl RaytracerConfig {
-    pub fn new() -> Self {
+impl Default for RaytracerConfig {
+    fn default() -> Self {
         RaytracerConfig {
             num_workers: num_cpus::get(),
             max_bounces: 4,
@@ -53,61 +41,22 @@ impl RaytracerConfig {
     }
 }
 
-pub struct RaytracerBuilder {
-    pub config: RaytracerConfig,
-}
 
-impl RaytracerBuilder {
+impl RaytracerConfig {
     pub fn new() -> Self {
-        RaytracerBuilder { 
-            config: RaytracerConfig::new(),
-        }
+        Self::default()
     }
-
-    pub fn with_workers(mut self, t: Option<usize>) -> Self {
-        self.config.num_workers = match t {
-            Some(t) => t,
-            None => num_cpus::get(),
-        };
-        return self;
-    }
-
-    pub fn with_camera_pos(mut self, v: Vector3<F>) -> Self {
-        self.config.camera_pos = v;
-        return self;
-    }
-
-    pub fn with_max_bounces(mut self, b: usize) -> Self {
-        self.config.max_bounces = b;
-        return self;
-    }
-
-    pub fn with_samples(mut self, s: usize) -> Self {
-        self.config.num_samples = s;
-        return self;
-    }
-
-    pub fn with_canvas(mut self, width: usize, height: usize) -> Self {
-        self.config.width = width;
-        self.config.height = height;
-        return self;
-    }
-
-    pub fn with_camera_fov(mut self, fov: F) -> Self {
-        self.config.fov = fov;
-        return self;
-    } 
 
     pub fn launch(self, scene: Scene) -> Vec<Vector3<u8>> {
         let mut thread_handles = Vec::new();
-        let THREAD_COUNT = self.config.num_workers;
+        let THREAD_COUNT = self.num_workers;
 
-        let image = RwLock::new(vec![Vector3::new(0.0, 0.0, 0.0); self.config.width * self.config.height]);
+        let image = RwLock::new(vec![Vector3::new(0.0, 0.0, 0.0); self.width * self.height]);
 
         
         for i in 0..THREAD_COUNT {
             let raytracer = Raytracer { 
-                config: self.config.clone(),
+                config: self.clone(),
                 scene: scene.clone(),
                 image: &image,
             };
@@ -134,7 +83,7 @@ impl RaytracerBuilder {
             h.join().unwrap();
         }
 
-        let mut export = vec![Vector3::new(0, 0, 0); self.config.width * self.config.height];
+        let mut export = vec![Vector3::new(0, 0, 0); self.width * self.height];
         for (i, p) in image.into_inner().unwrap().iter().enumerate() {
             // let tone_mapped = element_wise_division(p , &(p + Vector3::new(1.0, 1.0, 1.0)));
             let exposure = 1.0;
@@ -203,7 +152,6 @@ impl<'a> Raytracer<'a> {
             return Vector3::new(0.0, 0.0, 0.0);
         }
         
-        let scene = &self.scene;
         let intersect = self.intersect(ray);
 
         let (object, hit) = match intersect {
@@ -215,17 +163,14 @@ impl<'a> Raytracer<'a> {
         let normal = surface_properties.normal;
         let fragment_position = ray.origin + ray.direction * hit.distance;
 
-        match object.get_material() {
-            Material::Emission(intensity) => { return *intensity; },
-            _ => {}
-        }
         let (material_color, material_roughness, material_metalness) = match object.get_material() {
             Material::Diffuse(color, roughness) => (color, *roughness, 0.0),
             Material::Metal(color, roughness) => (color, *roughness, 1.0),
+            Material::Emission(_, color, roughness, metal) => { (color, *roughness, *metal) }
             _ => panic!()
         };
 
-        let samples = ((self.config.num_samples as f64) / ((depth + 1) as f64).log2());
+        let samples = (self.config.num_samples as f64) / ((depth + 1) as f64).log2();
         let mut diffuse_samples = samples / 2.0;
         let mut specular_samples = diffuse_samples;
 
@@ -244,7 +189,7 @@ impl<'a> Raytracer<'a> {
         let f0 = Vector3::new(0.04, 0.04, 0.04);
         let f0 = Self::lerp_vec(f0, *material_color, material_metalness);
 
-        for i in 0..diffuse_samples {
+        for _ in 0..diffuse_samples {
             let sample = self.uniform_sample_hemisphere();
             let sample_world = (local_cartesian_transform * sample).normalize();
 
@@ -267,7 +212,7 @@ impl<'a> Raytracer<'a> {
         total_indirect_diffuse /= (diffuse_samples as F + 0.0001) * (1.0 / (2.0 * PI));
 
         let reflect = (-view_dir - 2.0 * (-view_dir.dot(normal).max(0.0) * normal)).normalize();
-        for i in 0..specular_samples {
+        for _ in 0..specular_samples {
             fn importance_sample_ggx(reflect: Vector3<F>, roughness: F) -> Vector3<F> {
                 let r1: F = rand::random();
                 let r2: F = rand::random();
@@ -309,7 +254,12 @@ impl<'a> Raytracer<'a> {
         }
         total_indirect_specular /= (specular_samples as F + 0.00001);
 
-        return (total_indirect_specular + total_indirect_diffuse);
+        let emission = match object.get_material() {
+            Material::Emission(emission, _, _, _) => *emission,
+            _ => Vector3::new(0.0, 0.0, 0.0)
+        };
+
+        return emission + total_indirect_specular + total_indirect_diffuse;
     }
 
     fn ggx_distribution(n: Vector3<F>, h: Vector3<F>, roughness: F) -> F {
