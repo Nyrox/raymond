@@ -1,9 +1,12 @@
 use cgmath::*;
 use cgmath::prelude::*;
-use scene::{AABB, Triangle, Mesh, SurfaceProperties, Hit};
-use raytracer::{Ray};
 
-type F = f64;
+use super::{F};
+
+use super::primitives::{Ray, SurfaceProperties, Hit, AABB, Triangle};
+use super::mesh::Mesh;
+
+
 const GRID_DENSITY_BIAS: F = 3.0;
 
 fn estimate_grid_resolution(bounds: &AABB, triangle_count: usize) -> Vector3<usize> {

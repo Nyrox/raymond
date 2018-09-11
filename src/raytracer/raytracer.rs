@@ -1,11 +1,3 @@
-use scene::*;
-use num_traits;
-use cgmath::prelude::*;
-use cgmath::*;
-use std::cell::RefCell;
-use rand;
-use crossbeam_utils;
-
 use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT, Ordering};
 use std::time::{Duration, Instant};
 use std::sync::mpsc::channel;
@@ -15,14 +7,21 @@ use std::sync::Arc;
 use std::sync::RwLock;
 use std::marker;
 use std::f64;
+use std::cell::RefCell;
+
+use rand;
+use crossbeam_utils;
+use num_traits;
+use cgmath::*;
+use cgmath::prelude::*;
+
+use super::scene::*;
+use super::primitives::{Ray, Hit};
+use super::material::Material;
+
+use super::{F, PI, F_MAX};
 
 static LINE_COUNT: AtomicUsize = ATOMIC_USIZE_INIT;
-
-type F = f64;
-const F_MAX: F = f64::MAX;
-
-const PI: F = 3.141592;
-
 
 pub fn build() -> RaytracerBuilder {
     RaytracerBuilder::new()
@@ -112,7 +111,7 @@ impl RaytracerBuilder {
                 scene: scene.clone(),
                 image: &image,
             };
-            // let result = raytracer.trace(&raytracer.generate_primary_ray(335, 99), Vector3::new(0.0, 0.0, 0.0), raytracer.config.num_bounces).1;
+            // let result = raytracer.trace(raytracer.generate_primary_ray(335, 99), raytracer.config.camera_pos, 1);
             // println!("Result: {:?}", result);
             // panic!();
             unsafe {
@@ -160,24 +159,10 @@ impl RaytracerBuilder {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
-pub struct Ray {
-    pub origin: Vector3<F>,
-    pub direction: Vector3<F>,
-}
 
-impl Ray {
-    pub fn new (origin: Vector3<F>, direction: Vector3<F>) -> Ray {
-        Ray { origin, direction }
-    }
-}
 
 pub fn element_wise_map<Fun: Fn(F) -> F>(vec: &Vector3<F>, f: Fun) -> Vector3<F> {
     Vector3::new(f(vec.x), f(vec.y), f(vec.z))
-}
-
-pub fn element_wise_division(left: &Vector3<F>, right: &Vector3<F>) -> Vector3<F> {
-    Vector3::new(left.x / right.x, left.y / right.y, left.z / right.z)
 }
 
 #[derive(Clone)]
@@ -214,17 +199,17 @@ impl<'a> Raytracer<'a> {
     }
 
     fn trace(&self, ray: Ray, camera_pos: Vector3<F>, depth: usize) -> Vector3<F> {
-
+        if depth > self.config.max_bounces {
+            return Vector3::new(0.0, 0.0, 0.0);
+        }
         
-        // super::TRACE_COUNT.fetch_add(1, Ordering::Relaxed);
         let scene = &self.scene;
         let intersect = self.intersect(ray);
 
-        let (object, hit);
-        match intersect {
-            Some((o, h)) => { object = o; hit = h; }
+        let (object, hit) = match intersect {
+            Some((o, h)) => { (o, h) }
             None => return Vector3::new(0.0, 0.0, 0.0)
-        }
+        };
 
         let surface_properties = object.get_surface_properties(hit);
         let normal = surface_properties.normal;
@@ -240,10 +225,6 @@ impl<'a> Raytracer<'a> {
             _ => panic!()
         };
 
-        if depth > self.config.max_bounces {
-            return Vector3::new(0.0, 0.0, 0.0);
-        }
-
         let samples = ((self.config.num_samples as f64) / ((depth + 1) as f64).log2());
         let mut diffuse_samples = samples / 2.0;
         let mut specular_samples = diffuse_samples;
@@ -253,9 +234,7 @@ impl<'a> Raytracer<'a> {
 
         let specular_samples = specular_samples.round() as isize;
         let diffuse_samples = diffuse_samples.round() as isize;
-        
-        // println!("{:?}, {:?}, {}", diffuse_samples, specular_samples, material_metalness);
-        
+
         let mut total_indirect_specular = Vector3::new(0.0, 0.0, 0.0);
         let mut total_indirect_diffuse = Vector3::new(0.0, 0.0, 0.0);
         let local_cartesian = self.create_coordinate_system_of_n(normal);
@@ -269,13 +248,10 @@ impl<'a> Raytracer<'a> {
             let sample = self.uniform_sample_hemisphere();
             let sample_world = (local_cartesian_transform * sample).normalize();
 
-            let incoming_radiance = self.trace(Ray { origin: fragment_position + sample_world * 0.01, direction: sample_world }, fragment_position, depth + 1);
+            let radiance = self.trace(Ray { origin: fragment_position + sample_world * 0.00001, direction: sample_world }, fragment_position, depth + 1);
 
             let cos_theta = normal.dot(sample_world).max(0.0);
-            let radiance = incoming_radiance;
-
-            let light_dir = sample_world.normalize();
-            let halfway = (light_dir + view_dir).normalize();
+            let halfway = (sample_world + view_dir).normalize();
 
             let fresnel = Self::fresnel_schlick(halfway.dot(view_dir).max(0.0), f0);
 
@@ -311,7 +287,7 @@ impl<'a> Raytracer<'a> {
             }
             let sample_world = importance_sample_ggx(reflect, material_roughness);
             
-            let radiance = self.trace(Ray { origin: fragment_position + sample_world * 0.01, direction: sample_world }, fragment_position, depth + 1);
+            let radiance = self.trace(Ray { origin: fragment_position + sample_world * 0.00001, direction: sample_world }, fragment_position, depth + 1);
             let cos_theta = normal.dot(sample_world).max(0.0);;
             let light_dir = sample_world.normalize();
             let halfway = (light_dir + view_dir).normalize();
