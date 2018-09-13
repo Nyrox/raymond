@@ -45,7 +45,7 @@ fn main() {
     //     Vector3::new(0.05, 0.25, 1.00), 0.02
     // )}));
 
-    let mut cube_mesh = Mesh::load_ply(PathBuf::from("assets/meshes/dragon_vrip.ply"));
+    let mut cube_mesh = Mesh::load_ply(PathBuf::from("assets/meshes/suzanne_flat.ply"));
     cube_mesh.bake_transform(Vector3::new(0.0, -0.0, 2.9));
     // let mut cube_mesh = Arc::new(cube_mesh);
     let mut cube_grid = acc_grid::AccGrid::build_from_mesh(cube_mesh);
@@ -76,29 +76,29 @@ fn main() {
     )}));
     // Backwall
     scene.objects.push(Object::Plane(Plane { origin: Vector3::new(0.0, 0.0, 5.0), normal: Vector3::new(0.0, 0.0, -1.0), material: Material::Diffuse(
-        Vector3::new(1.0, 0.0, 0.0), 0.5
+        Vector3::new(1.0, 0.1, 0.1), 0.5
     )}));
     // left wall
     scene.objects.push(Object::Plane(Plane { origin: Vector3::new(-2.0, 0.0, 0.0), normal: Vector3::new(1.0, 0.0, 0.0), material: Material::Diffuse(
-        Vector3::new(0.0, 0.0, 1.0), 0.5
+        Vector3::new(0.1, 1.0, 0.1), 0.5
     )}));
     // right wall
     scene.objects.push(Object::Plane(Plane { origin: Vector3::new(2.0, 0.0, 0.0), normal: Vector3::new(-1.0, 0.0, 0.0), material: Material::Diffuse(
-        Vector3::new(0.0, 1.0, 0.0), 0.5
+        Vector3::new(0.1, 1.0, 0.1), 0.5
     )}));
 
 
     // scene.lights.push(Light { position: Vector3::new(0.0, 1.95, 2.5), intensity: Vector3::new(0.8, 0.8, 1.0) });
     // scene.lights.push(Light { position: Vector3::new(1.75, -0.75, 1.0), intensity: Vector3::new(0.8, 1.0, 0.7) });
-    let HEIGHT = 400;
+    let HEIGHT = 340;
     let WIDTH = HEIGHT / 9 * 16;
 
     let config = RaytracerConfig {
         width: WIDTH,
         height: HEIGHT,
         fov: 50.0,
-        num_samples: 12,
-        max_bounces: 4,
+        num_samples: 40,
+        max_bounces: 5,
 
         ..RaytracerConfig::default()
     };

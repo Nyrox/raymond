@@ -68,8 +68,12 @@ impl RaytracerConfig {
                     let start = raytracer.config.height / THREAD_COUNT * i;
                     for y in start..(start + raytracer.config.height / THREAD_COUNT) {
                         for x in 0..raytracer.config.width {
-                            let ray = raytracer.generate_primary_ray(x, y);
-                            let result = raytracer.trace(ray, raytracer.config.camera_pos, 1);
+                            let mut result = Vector3::new(0.0, 0.0, 0.0);
+                            for _ in 0..raytracer.config.num_samples {
+                                let ray = raytracer.generate_primary_ray(x, y);
+                                result += raytracer.trace(ray, raytracer.config.camera_pos, 1);
+                            }
+                            result /= raytracer.config.num_samples as F;
                             raytracer.image.write().unwrap()[x + y * raytracer.config.width] = result;
                         }
 
@@ -153,7 +157,6 @@ impl<'a> Raytracer<'a> {
         }
         
         let intersect = self.intersect(ray);
-
         let (object, hit) = match intersect {
             Some((o, h)) => { (o, h) }
             None => return Vector3::new(0.0, 0.0, 0.0)
@@ -166,31 +169,23 @@ impl<'a> Raytracer<'a> {
         let (material_color, material_roughness, material_metalness) = match object.get_material() {
             Material::Diffuse(color, roughness) => (color, *roughness, 0.0),
             Material::Metal(color, roughness) => (color, *roughness, 1.0),
-            Material::Emission(_, color, roughness, metal) => { (color, *roughness, *metal) }
+            Material::Emission(e, _, _, _) => { return *e; }
             _ => panic!()
         };
 
-        let samples = (self.config.num_samples as f64) / ((depth + 1) as f64).log2();
-        let mut diffuse_samples = samples / 2.0;
-        let mut specular_samples = diffuse_samples;
-
-        specular_samples += diffuse_samples * material_metalness;
-        diffuse_samples -= diffuse_samples * material_metalness;
-
-        let specular_samples = specular_samples.round() as isize;
-        let diffuse_samples = diffuse_samples.round() as isize;
-
-        let mut total_indirect_specular = Vector3::new(0.0, 0.0, 0.0);
-        let mut total_indirect_diffuse = Vector3::new(0.0, 0.0, 0.0);
-        let local_cartesian = self.create_coordinate_system_of_n(normal);
-        let local_cartesian_transform = Matrix3::from_cols(local_cartesian.0, normal, local_cartesian.1);
-        
         let view_dir = (camera_pos - fragment_position).normalize();
         let f0 = Vector3::new(0.04, 0.04, 0.04);
         let f0 = Self::lerp_vec(f0, *material_color, material_metalness);
 
-        for _ in 0..diffuse_samples {
-            let sample = self.uniform_sample_hemisphere();
+        // Decide whether to sample diffuse or specular
+        let r = rand::random::<F>();
+        let local_cartesian = self.create_coordinate_system_of_n(normal);
+        let local_cartesian_transform = Matrix3::from_cols(local_cartesian.0, normal, local_cartesian.1);
+
+        let prob_d = Self::lerp(0.5, 0.0, material_metalness);
+
+        if r < prob_d {
+            let (sample, pdf) = self.uniform_sample_hemisphere();
             let sample_world = (local_cartesian_transform * sample).normalize();
 
             let radiance = self.trace(Ray { origin: fragment_position + sample_world * 0.00001, direction: sample_world }, fragment_position, depth + 1);
@@ -199,7 +194,7 @@ impl<'a> Raytracer<'a> {
             let halfway = (sample_world + view_dir).normalize();
 
             let fresnel = Self::fresnel_schlick(halfway.dot(view_dir).max(0.0), f0);
-
+            
             let specular_part = fresnel;
             let mut diffuse_part = Vector3::new(1.0, 1.0, 1.0) - specular_part;
 
@@ -207,12 +202,11 @@ impl<'a> Raytracer<'a> {
 
             let output = (diffuse_part.mul_element_wise(*material_color) / PI).mul_element_wise(radiance) * cos_theta;
 
-            total_indirect_diffuse += output;
+            return output / prob_d / pdf;
         }
-        total_indirect_diffuse /= (diffuse_samples as F + 0.0001) * (1.0 / (2.0 * PI));
-
-        let reflect = (-view_dir - 2.0 * (-view_dir.dot(normal).max(0.0) * normal)).normalize();
-        for _ in 0..specular_samples {
+        else {
+            // Sample specular
+            let reflect = (-view_dir - 2.0 * (-view_dir.dot(normal).max(0.0) * normal)).normalize();
             fn importance_sample_ggx(reflect: Vector3<F>, roughness: F) -> Vector3<F> {
                 let r1: F = rand::random();
                 let r2: F = rand::random();
@@ -250,16 +244,8 @@ impl<'a> Raytracer<'a> {
             let pdf = {
                 (D * normal.dot(halfway).max(0.0)) / (4.0 * halfway.dot(view_dir).max(0.0)) + 0.0001
             };
-            total_indirect_specular += output / pdf;
+            return output / (1.0 - prob_d) / pdf;
         }
-        total_indirect_specular /= (specular_samples as F + 0.00001);
-
-        let emission = match object.get_material() {
-            Material::Emission(emission, _, _, _) => *emission,
-            _ => Vector3::new(0.0, 0.0, 0.0)
-        };
-
-        return emission + total_indirect_specular + total_indirect_diffuse;
     }
 
     fn ggx_distribution(n: Vector3<F>, h: Vector3<F>, roughness: F) -> F {
@@ -296,15 +282,16 @@ impl<'a> Raytracer<'a> {
         min + a * (max - min)
     }
 
-    fn uniform_sample_hemisphere(&self) -> Vector3<F> {
+    fn uniform_sample_hemisphere(&self) -> (Vector3<F>, F) {
         let r1 = rand::random::<F>();
         let r2 = rand::random::<F>();
 
-        let sin_theta = (1.0 - r1 * r1).sqrt();
+        let theta = (r1.sqrt()).acos();
         let phi = 2.0 * PI * r2;
-        let x = sin_theta * phi.cos();
-        let z = sin_theta * phi.sin();
-        return Vector3::new(x, r1, z);
+
+        let pdf = r1.sqrt() / PI;        
+        let cartesian = Vector3::new(theta.sin() * phi.cos(), theta.cos(), theta.sin() * phi.sin());
+        return (cartesian, pdf);
     }
     
     fn create_coordinate_system_of_n(&self, n: Vector3<F>) -> (Vector3<F>, Vector3<F>) {
@@ -322,8 +309,8 @@ impl<'a> Raytracer<'a> {
 
     fn generate_primary_ray(&self, x: usize, y: usize) -> Ray {
         let width = self.config.width as F; let height = self.config.height as F;
-        let x = x as F; let y = y as F;
         let aspect = width / height;
+        let x = x as F + (rand::random::<F>() - 0.5); let y = y as F + (rand::random::<F>() - 0.5);
 
         let px = (2.0 * ((x + 0.5) / width) - 1.0) * F::tan(self.config.fov / 2.0 * PI / 180.0) * aspect;
         let py = (1.0 - 2.0 * ((y + 0.5) / height)) * F::tan(self.config.fov / 2.0 * PI / 180.0);
