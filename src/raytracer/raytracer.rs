@@ -179,7 +179,7 @@ impl<'a> Raytracer<'a> {
 
         // Decide whether to sample diffuse or specular
         let r = rand::random::<F>();
-        let local_cartesian = self.create_coordinate_system_of_n(normal);
+        let local_cartesian = Self::create_coordinate_system_of_n(normal);
         let local_cartesian_transform = Matrix3::from_cols(local_cartesian.0, normal, local_cartesian.1);
 
         let prob_d = Self::lerp(0.5, 0.0, material_metalness);
@@ -188,7 +188,7 @@ impl<'a> Raytracer<'a> {
             let (sample, pdf) = self.uniform_sample_hemisphere();
             let sample_world = (local_cartesian_transform * sample).normalize();
 
-            let radiance = self.trace(Ray { origin: fragment_position + sample_world * 0.00001, direction: sample_world }, fragment_position, depth + 1);
+            let radiance = self.trace(Ray { origin: fragment_position + normal * 0.00001, direction: sample_world }, fragment_position, depth + 1);
 
             let cos_theta = normal.dot(sample_world).max(0.0);
             let halfway = (sample_world + view_dir).normalize();
@@ -206,7 +206,7 @@ impl<'a> Raytracer<'a> {
         }
         else {
             // Sample specular
-            let reflect = (-view_dir - 2.0 * (-view_dir.dot(normal).max(0.0) * normal)).normalize();
+            let reflect = (-view_dir - 2.0 * (-view_dir.dot(normal) * normal)).normalize();
             fn importance_sample_ggx(reflect: Vector3<F>, roughness: F) -> Vector3<F> {
                 let r1: F = rand::random();
                 let r2: F = rand::random();
@@ -218,31 +218,29 @@ impl<'a> Raytracer<'a> {
 
                 let h = Vector3::new(phi.cos() * sin_theta, phi * sin_theta, cos_theta);
 
-                let up = if reflect.z.abs() < 0.999 { Vector3::new(0.0, 0.0, 1.0) } else { Vector3::new(1.0, 0.0, 0.0) };
-                let tangent = up.cross(reflect).normalize();
-                let bitangent = reflect.cross(tangent);
+                let (tangent, bitangent) = Raytracer::create_coordinate_system_of_n(h);
 
                 return (tangent * h.x + bitangent * h.y + reflect * h.z).normalize();
             }
             let sample_world = importance_sample_ggx(reflect, material_roughness);
             
-            let radiance = self.trace(Ray { origin: fragment_position + sample_world * 0.00001, direction: sample_world }, fragment_position, depth + 1);
-            let cos_theta = normal.dot(sample_world).max(0.0);;
+            let radiance = self.trace(Ray { origin: fragment_position + normal * 0.0001, direction: sample_world }, fragment_position, depth + 1);
+            let cos_theta = normal.dot(sample_world);
             let light_dir = sample_world.normalize();
             let halfway = (light_dir + view_dir).normalize();
-            let F = Self::fresnel_schlick(halfway.dot(view_dir).max(0.0), f0);
+            let F = Self::fresnel_schlick(halfway.dot(view_dir), f0);
             let D = Self::ggx_distribution(normal, halfway, material_roughness);
             let G = Self::geometry_smith(normal, view_dir, sample_world, material_roughness);
 
             let nominator = D * G * F;
-            let denominator = 4.0 * normal.dot(view_dir).max(0.0) * cos_theta + 0.001;
+            let denominator = 4.0 * normal.dot(view_dir) * cos_theta + 0.001;
             let specular = nominator / denominator;
 
             let output = (specular).mul_element_wise(radiance) * cos_theta;
 
             // pdf
             let pdf = {
-                (D * normal.dot(halfway).max(0.0)) / (4.0 * halfway.dot(view_dir).max(0.0)) + 0.0001
+                (D * normal.dot(halfway)) / (4.0 * halfway.dot(view_dir)) + 0.0001
             };
             return output / (1.0 - prob_d) / pdf;
         }
@@ -250,7 +248,7 @@ impl<'a> Raytracer<'a> {
 
     fn ggx_distribution(n: Vector3<F>, h: Vector3<F>, roughness: F) -> F {
         let a2 = roughness*roughness;
-        let NdotH = n.dot(h).max(0.0);
+        let NdotH = n.dot(h);
 
         let nominator = a2;
         let denominator = NdotH.powf(2.0) * (a2 - 1.0) + 1.0;
@@ -294,17 +292,14 @@ impl<'a> Raytracer<'a> {
         return (cartesian, pdf);
     }
     
-    fn create_coordinate_system_of_n(&self, n: Vector3<F>) -> (Vector3<F>, Vector3<F>) {
-        let mut nt;
-        if n.x.abs() > n.y.abs() {
-            nt = Vector3::new(n.z, 0.0, -n.x).normalize();
-        }
-        else {
-            nt = Vector3::new(0.0, -n.z, n.y).normalize();
-        }
-        let nb = n.cross(nt);
-
-        return (nt, nb);
+    fn create_coordinate_system_of_n(n: Vector3<F>) -> (Vector3<F>, Vector3<F>) {
+        let sign = if n.z > 0.0 { 1.0 } else { -1.0 };
+        let a = -1.0 / (sign + n.z);
+        let b = n.x * n.y * a;
+        return (
+            Vector3::new(1.0 + sign * n.x * n.x * a, sign * b, -sign * n.x),
+            Vector3::new(b, sign + n.y * n.y * a, -n.y),
+        );
     }
 
     fn generate_primary_ray(&self, x: usize, y: usize) -> Ray {

@@ -155,7 +155,7 @@ impl Triangle {
             (self.0.normal * bc);
 
         return SurfaceProperties {
-            normal
+            normal: normal.normalize()
         };
     }
 

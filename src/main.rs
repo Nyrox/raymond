@@ -45,7 +45,7 @@ fn main() {
     //     Vector3::new(0.05, 0.25, 1.00), 0.02
     // )}));
 
-    let mut cube_mesh = Mesh::load_ply(PathBuf::from("assets/meshes/suzanne_flat.ply"));
+    let mut cube_mesh = Mesh::load_ply(PathBuf::from("assets/meshes/suzanne.ply"));
     cube_mesh.bake_transform(Vector3::new(0.0, -0.0, 2.9));
     // let mut cube_mesh = Arc::new(cube_mesh);
     let mut cube_grid = acc_grid::AccGrid::build_from_mesh(cube_mesh);
@@ -56,7 +56,7 @@ fn main() {
 
     let cube_grid = Arc::new(cube_grid);
     let cube_model = Object::Grid(cube_grid, Material::Metal(
-        Vector3::new(1.0, 1.0, 0.1), 0.2
+        Vector3::new(1.0, 1.0, 0.1), 0.3
     ));
 
     scene.objects.push(cube_model);
@@ -76,11 +76,11 @@ fn main() {
     )}));
     // Backwall
     scene.objects.push(Object::Plane(Plane { origin: Vector3::new(0.0, 0.0, 5.0), normal: Vector3::new(0.0, 0.0, -1.0), material: Material::Diffuse(
-        Vector3::new(1.0, 0.1, 0.1), 0.5
+        Vector3::new(1.0, 0.1, 0.1), 0.2
     )}));
     // left wall
     scene.objects.push(Object::Plane(Plane { origin: Vector3::new(-2.0, 0.0, 0.0), normal: Vector3::new(1.0, 0.0, 0.0), material: Material::Diffuse(
-        Vector3::new(0.1, 1.0, 0.1), 0.5
+        Vector3::new(0.1, 0.0, 1.1), 0.5
     )}));
     // right wall
     scene.objects.push(Object::Plane(Plane { origin: Vector3::new(2.0, 0.0, 0.0), normal: Vector3::new(-1.0, 0.0, 0.0), material: Material::Diffuse(
@@ -97,8 +97,8 @@ fn main() {
         width: WIDTH,
         height: HEIGHT,
         fov: 50.0,
-        num_samples: 40,
-        max_bounces: 5,
+        num_samples: 30,
+        max_bounces: 4,
 
         ..RaytracerConfig::default()
     };
