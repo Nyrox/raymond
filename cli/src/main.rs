@@ -1,21 +1,15 @@
-
 #![feature(duration_as_u128)]
 #![feature(nll)]
 
-extern crate num_traits;
+extern crate raytracer;
 extern crate cgmath;
 extern crate image;
-extern crate rand;
-extern crate crossbeam_utils;
-extern crate num_cpus;
-
-pub mod raytracer;
 
 use raytracer::primitives::{Plane};
 use raytracer::mesh::Mesh;
 use raytracer::scene::{Scene, Object};
 use raytracer::material::Material;
-use raytracer::raytracer::*;
+use raytracer::trace::*;
 use raytracer::acc_grid;
 
 use cgmath::Vector3;
@@ -45,8 +39,8 @@ fn main() {
     //     Vector3::new(0.05, 0.25, 1.00), 0.02
     // )}));
 
-    let mut cube_mesh = Mesh::load_ply(PathBuf::from("assets/meshes/suzanne.ply"));
-    cube_mesh.bake_transform(Vector3::new(0.0, -0.0, 2.9));
+    let mut cube_mesh = Mesh::load_ply(PathBuf::from("assets/meshes/dragon_vrip.ply"));
+    cube_mesh.bake_transform(Vector3::new(0.0, -0.3, 2.9));
     // let mut cube_mesh = Arc::new(cube_mesh);
     let mut cube_grid = acc_grid::AccGrid::build_from_mesh(cube_mesh);
     // let hit = cube_grid.intersects(&Ray { origin: Vector3::new(0.0, 0.0, 0.0), direction: Vector3::new(0.0, 0.0, 1.0) });
@@ -56,7 +50,7 @@ fn main() {
 
     let cube_grid = Arc::new(cube_grid);
     let cube_model = Object::Grid(cube_grid, Material::Metal(
-        Vector3::new(1.0, 1.0, 0.1), 0.3
+        Vector3::new(1.0, 1.0, 0.1), 0.15
     ));
 
     scene.objects.push(cube_model);
@@ -68,7 +62,7 @@ fn main() {
     )}));
     // Ceiling
     scene.objects.push(Object::Plane(Plane { origin: Vector3::new(0.0, 2.0, 0.0), normal: Vector3::new(0.0, -1.0, 0.0), material: Material::Emission(
-        Vector3::new(2.0, 2.0, 2.0), Vector3::new(1.0, 1.0, 1.0), 0.27, 0.0
+        Vector3::new(1.5, 1.5, 1.5), Vector3::new(1.0, 1.0, 1.0), 0.27, 0.0
     )}));
     // Frontwall
     scene.objects.push(Object::Plane(Plane { origin: Vector3::new(0.0, 0.0, -2.0), normal: Vector3::new(0.0, 0.0, 1.0), material: Material::Diffuse(
@@ -76,15 +70,15 @@ fn main() {
     )}));
     // Backwall
     scene.objects.push(Object::Plane(Plane { origin: Vector3::new(0.0, 0.0, 5.0), normal: Vector3::new(0.0, 0.0, -1.0), material: Material::Diffuse(
-        Vector3::new(1.0, 0.1, 0.1), 0.2
+        Vector3::new(0.0, 0.0, 0.0), 0.9
     )}));
     // left wall
     scene.objects.push(Object::Plane(Plane { origin: Vector3::new(-2.0, 0.0, 0.0), normal: Vector3::new(1.0, 0.0, 0.0), material: Material::Diffuse(
-        Vector3::new(0.1, 0.0, 1.1), 0.5
+        Vector3::new(0.0, 0.0, 0.0), 0.9
     )}));
     // right wall
     scene.objects.push(Object::Plane(Plane { origin: Vector3::new(2.0, 0.0, 0.0), normal: Vector3::new(-1.0, 0.0, 0.0), material: Material::Diffuse(
-        Vector3::new(0.1, 1.0, 0.1), 0.5
+        Vector3::new(0.0, 0.0, 0.0), 0.9
     )}));
 
 
@@ -97,8 +91,8 @@ fn main() {
         width: WIDTH,
         height: HEIGHT,
         fov: 50.0,
-        num_samples: 30,
-        max_bounces: 4,
+        num_samples: 10,
+        max_bounces: 5,
 
         ..RaytracerConfig::default()
     };

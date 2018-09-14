@@ -47,6 +47,74 @@ impl RaytracerConfig {
         Self::default()
     }
 
+    pub fn launch_tiled(self, scene: Scene) -> super::Tile {
+        let mut thread_handles = Vec::new();
+        let THREAD_COUNT = self.num_workers;
+
+        let image = RwLock::new(vec![Vector3::new(0.0, 0.0, 0.0); self.width * self.height]);
+
+        
+        for i in 0..THREAD_COUNT {
+            let raytracer = Raytracer { 
+                config: self.clone(),
+                scene: scene.clone(),
+                image: &image,
+            };
+            // let result = raytracer.trace(raytracer.generate_primary_ray(335, 99), raytracer.config.camera_pos, 1);
+            // println!("Result: {:?}", result);
+            // panic!();
+            unsafe {
+                thread_handles.push(crossbeam_utils::thread::spawn_unchecked(move || {
+                    let start = raytracer.config.height / THREAD_COUNT * i;
+                    for y in start..(start + raytracer.config.height / THREAD_COUNT) {
+                        for x in 0..raytracer.config.width {
+                            let mut result = Vector3::new(0.0, 0.0, 0.0);
+                            for _ in 0..raytracer.config.num_samples {
+                                let ray = raytracer.generate_primary_ray(x, y);
+                                result += raytracer.trace(ray, raytracer.config.camera_pos, 1);
+                            }
+                            result /= raytracer.config.num_samples as F;
+                            raytracer.image.write().unwrap()[x + y * raytracer.config.width] = result;
+                        }
+
+                        println!("Finished line {} of {}", y, raytracer.config.height);
+                    }
+                }));
+            }
+        }
+
+        for h in thread_handles {
+            h.join().unwrap();
+        }
+
+        let mut export = vec![Vector3::new(0.0, 0.0, 0.0); self.width * self.height];
+        for (i, p) in image.into_inner().unwrap().iter().enumerate() {
+            // let tone_mapped = element_wise_division(p , &(p + Vector3::new(1.0, 1.0, 1.0)));
+            let exposure = 1.0;
+            let gamma = 2.2;
+            let tone_mapped = Vector3::new(1.0, 1.0, 1.0) - element_wise_map(&(p * -1.0 * exposure), |e| F::exp(e));
+            let tone_mapped = element_wise_map(&tone_mapped, |x| x.powf(1.0 / gamma));
+      
+            for i in 0..3 {
+                let e = tone_mapped[i];
+                if e > 1.0 || e < 0.0 {
+                    println!("Problem: {:?}", e);
+                }
+            }
+            
+            export[i] = tone_mapped;
+        }
+
+        let tile = super::Tile {
+            left: 0, top: 0,
+            width: self.width,
+            height: self.height,
+            data: export
+        };
+
+        return tile;
+    }
+
     pub fn launch(self, scene: Scene) -> Vec<Vector3<u8>> {
         let mut thread_handles = Vec::new();
         let THREAD_COUNT = self.num_workers;
@@ -200,9 +268,9 @@ impl<'a> Raytracer<'a> {
 
             diffuse_part *= 1.0 - material_metalness;
 
-            let output = (diffuse_part.mul_element_wise(*material_color) / PI).mul_element_wise(radiance) * cos_theta;
+            let output = (diffuse_part.mul_element_wise(*material_color)).mul_element_wise(radiance) * cos_theta;
 
-            return output / prob_d / pdf;
+            return output / (prob_d * pdf);
         }
         else {
             // Sample specular
@@ -213,17 +281,18 @@ impl<'a> Raytracer<'a> {
 
                 let a = roughness*roughness;
                 let phi = 2.0 * PI * r1;
-                let cos_theta = ((1.0 - r2) / (1.0 + (a*a - 1.0) * r2)).sqrt();
-                let sin_theta = (1.0 - cos_theta*cos_theta).sqrt();
+                let theta = a * (r2 / (1.0 - r2)).sqrt();
 
-                let h = Vector3::new(phi.cos() * sin_theta, phi * sin_theta, cos_theta);
+                let h = Vector3::new(theta.sin() * phi.cos(), theta.cos(), theta.sin() * phi.sin());
 
-                let (tangent, bitangent) = Raytracer::create_coordinate_system_of_n(h);
+                let (tangent, bitangent) = Raytracer::create_coordinate_system_of_n(reflect);
+                let matrix = Matrix3::from_cols(tangent, reflect, bitangent);
 
-                return (tangent * h.x + bitangent * h.y + reflect * h.z).normalize();
+                return (matrix * h).normalize();
             }
             let sample_world = importance_sample_ggx(reflect, material_roughness);
-            
+
+
             let radiance = self.trace(Ray { origin: fragment_position + normal * 0.0001, direction: sample_world }, fragment_position, depth + 1);
             let cos_theta = normal.dot(sample_world);
             let light_dir = sample_world.normalize();
@@ -287,7 +356,7 @@ impl<'a> Raytracer<'a> {
         let theta = (r1.sqrt()).acos();
         let phi = 2.0 * PI * r2;
 
-        let pdf = r1.sqrt() / PI;        
+        let pdf = r1.sqrt();        
         let cartesian = Vector3::new(theta.sin() * phi.cos(), theta.cos(), theta.sin() * phi.sin());
         return (cartesian, pdf);
     }

@@ -1,5 +1,5 @@
 [package]
-name = "raytracer-rs"
+name = "raytracer"
 version = "0.1.0"
 authors = ["Nyrox <root@nyrox.tech>"]
 
@@ -10,3 +10,8 @@ num-traits="*"
 rand="*"
 crossbeam-utils="0.5.0"
 num_cpus="*"
+
+[workspace]
+members=[
+	"cli",
+]
