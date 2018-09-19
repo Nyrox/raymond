@@ -53,9 +53,9 @@ impl RaytracerConfig {
 
         let image = RwLock::new(vec![Vector3::new(0.0, 0.0, 0.0); self.width * self.height]);
 
-        
+
         for i in 0..THREAD_COUNT {
-            let raytracer = Raytracer { 
+            let raytracer = Raytracer {
                 config: self.clone(),
                 scene: scene.clone(),
                 image: &image,
@@ -70,7 +70,7 @@ impl RaytracerConfig {
                         for x in 0..raytracer.config.width {
                             let mut result = Vector3::new(0.0, 0.0, 0.0);
                             for _ in 0..raytracer.config.num_samples {
-                                let ray = raytracer.generate_primary_ray(x, y);
+                                let ray = raytracer.generate_primary_ray_with_dof(x, y);
                                 result += raytracer.trace(ray, raytracer.config.camera_pos, 1);
                             }
                             result /= raytracer.config.num_samples as F;
@@ -94,14 +94,14 @@ impl RaytracerConfig {
             let gamma = 2.2;
             let tone_mapped = Vector3::new(1.0, 1.0, 1.0) - element_wise_map(&(p * -1.0 * exposure), |e| F::exp(e));
             let tone_mapped = element_wise_map(&tone_mapped, |x| x.powf(1.0 / gamma));
-      
+
             for i in 0..3 {
                 let e = tone_mapped[i];
                 if e > 1.0 || e < 0.0 {
                     println!("Problem: {:?}", e);
                 }
             }
-            
+
             export[i] = tone_mapped;
         }
 
@@ -121,9 +121,9 @@ impl RaytracerConfig {
 
         let image = RwLock::new(vec![Vector3::new(0.0, 0.0, 0.0); self.width * self.height]);
 
-        
+
         for i in 0..THREAD_COUNT {
-            let raytracer = Raytracer { 
+            let raytracer = Raytracer {
                 config: self.clone(),
                 scene: scene.clone(),
                 image: &image,
@@ -162,14 +162,14 @@ impl RaytracerConfig {
             let gamma = 2.2;
             let tone_mapped = Vector3::new(1.0, 1.0, 1.0) - element_wise_map(&(p * -1.0 * exposure), |e| F::exp(e));
             let tone_mapped = element_wise_map(&tone_mapped, |x| x.powf(1.0 / gamma));
-      
+
             for i in 0..3 {
                 let e = tone_mapped[i];
                 if e > 1.0 || e < 0.0 {
                     println!("Problem: {:?}", e);
                 }
             }
-            
+
             match (tone_mapped * 255.0).cast() {
                 Some(v) => { export[i] = v; },
                 None => { println!("PROBLEM: {:?}", tone_mapped * 255.0) }
@@ -223,7 +223,7 @@ impl<'a> Raytracer<'a> {
         if depth > self.config.max_bounces {
             return Vector3::new(0.0, 0.0, 0.0);
         }
-        
+
         let intersect = self.intersect(ray);
         let (object, hit) = match intersect {
             Some((o, h)) => { (o, h) }
@@ -262,7 +262,7 @@ impl<'a> Raytracer<'a> {
             let halfway = (sample_world + view_dir).normalize();
 
             let fresnel = Self::fresnel_schlick(halfway.dot(view_dir).max(0.0), f0);
-            
+
             let specular_part = fresnel;
             let mut diffuse_part = Vector3::new(1.0, 1.0, 1.0) - specular_part;
 
@@ -356,11 +356,11 @@ impl<'a> Raytracer<'a> {
         let theta = (r1.sqrt()).acos();
         let phi = 2.0 * PI * r2;
 
-        let pdf = r1.sqrt();        
+        let pdf = r1.sqrt();
         let cartesian = Vector3::new(theta.sin() * phi.cos(), theta.cos(), theta.sin() * phi.sin());
         return (cartesian, pdf);
     }
-    
+
     fn create_coordinate_system_of_n(n: Vector3<F>) -> (Vector3<F>, Vector3<F>) {
         let sign = if n.z > 0.0 { 1.0 } else { -1.0 };
         let a = -1.0 / (sign + n.z);
@@ -380,5 +380,41 @@ impl<'a> Raytracer<'a> {
         let py = (1.0 - 2.0 * ((y + 0.5) / height)) * F::tan(self.config.fov / 2.0 * PI / 180.0);
 
         Ray::new(self.config.camera_pos, Vector3::new(px, py, 1.0).normalize())
+    }
+
+    fn generate_primary_ray_with_dof(&self, x: usize, y: usize) -> Ray {
+        use primitives::Plane;
+
+        let primary = self.generate_primary_ray(x, y);
+        let r1 = rand::random::<F>() * 2.0 - 1.0;
+        let r2 = rand::random::<F>() * 2.0 - 1.0;
+
+        // chose random point on the aperture, through rejection sampling
+        let FOCAL_LENGTH = 4.0;
+        let APERTURE_RADIUS = 5.5;
+
+        let start = loop {
+            let ax = self.config.camera_pos.x + r1 * APERTURE_RADIUS;
+            let ay = self.config.camera_pos.y + r2 * APERTURE_RADIUS;
+
+            let _start = Vector3::new(ax, ay, self.config.camera_pos.z);
+            if _start.distance(self.config.camera_pos) < APERTURE_RADIUS {
+                break _start;
+            }
+        };
+
+        let focal_plane = Plane {
+            origin: self.config.camera_pos + Vector3::new(0.0, 0.0, 1.0) * FOCAL_LENGTH,
+            normal: Vector3::new(0.0, 0.0, -1.0),
+            material: Material::Diffuse(
+                Vector3::new(0.75, 0.75, 0.75), 0.5
+            )
+        };
+        let end = self.config.camera_pos + focal_plane.intersects(primary).unwrap().distance * primary.direction;
+
+        return Ray {
+            origin: start,
+            direction: (end - start).normalize()
+        };
     }
 }
