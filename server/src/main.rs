@@ -1,39 +1,24 @@
-#![feature(duration_as_u128)]
-#![feature(nll)]
-
-extern crate cgmath;
-extern crate image;
 extern crate raytracer;
+extern crate ws;
+#[macro_use]
+extern crate serde;
+extern crate serde_json;
 
-use raytracer::{
-	acc_grid,
-	material::Material,
-	mesh::Mesh,
-	primitives::Plane,
-	scene::{Object, Scene},
-	trace::*,
-};
+use raytracer::{prelude::*, *};
+use ws::*;
 
-use cgmath::Vector3;
-use std::cell::RefCell;
+use std::path::PathBuf;
+use std::sync::Arc;
 
-use std::{
-	path::PathBuf,
-	sync::{
-		atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT},
-		Arc, RwLock,
-	},
-	time::{Duration, Instant},
-};
+struct Server {
+	sender: Sender,
+}
 
-static TRACE_COUNT: AtomicUsize = ATOMIC_USIZE_INIT;
-static SHADOW_RAY_COUNT: AtomicUsize = ATOMIC_USIZE_INIT;
-static SHADOW_TOTAL_TIME: AtomicUsize = ATOMIC_USIZE_INIT;
+impl Handler for Server {
+	fn on_open(&mut self, _: Handshake) -> Result<()> {
+		println!("Connection established.");
 
-fn main() {
-	let now = Instant::now();
-
-	let mut scene = Scene::new();
+			let mut scene = Scene::new();
 	let mut sphere_mesh = Mesh::load_ply(PathBuf::from("assets/meshes/ico_sphere.ply"));
 
 	// scene.objects.push(Object::Sphere(Sphere { origin: Vector3::new(-1.5, -0.5, 3.5), radius: 0.5, material: Material::Diffuse(
@@ -94,36 +79,40 @@ fn main() {
 		material: Material::Diffuse(Vector3::new(0.0, 0.0, 0.0), 0.9),
 	}));
 
-	// scene.lights.push(Light { position: Vector3::new(0.0, 1.95, 2.5), intensity: Vector3::new(0.8, 0.8, 1.0) });
-	// scene.lights.push(Light { position: Vector3::new(1.75, -0.75, 1.0), intensity: Vector3::new(0.8, 1.0, 0.7) });
-	let HEIGHT = 340;
-	let WIDTH = HEIGHT / 9 * 16;
+		let WIDTH = 400;
+		let HEIGHT = 340;
 
-	let config = RaytracerConfig {
-		width: WIDTH,
-		height: HEIGHT,
-		fov: 50.0,
-		num_samples: 5,
-		max_bounces: 3,
+		let config = RaytracerConfig {
+			width: WIDTH,
+			height: HEIGHT,
+			fov: 50.0,
+			num_samples: 500,
+			max_bounces: 5,
 
-		..RaytracerConfig::default()
-	};
+			..RaytracerConfig::default()
+		};
 
-	let final_image: Vec<[u8; 3]> = config.launch(scene.clone()).into_iter().map(|p| p.into()).collect();
-
-	println!("Finished render.\nTotal render time: {}s\nTotal amount of trace calls: {}\nTotal amount of shadow rays cast: {}\n",
-        (Instant::now() - now).as_millis() as f32 / 1000.0,
-        TRACE_COUNT.load(Ordering::Relaxed),
-        SHADOW_RAY_COUNT.load(Ordering::Relaxed),
-    );
-	println!(
-		"Total time spent on shadow rays: {}s",
-		SHADOW_TOTAL_TIME.load(Ordering::Relaxed) as f32 / 1000.0 / 1000.0 / 1000.0
-	);
-
-	let image: image::ImageBuffer<image::Rgb<u8>, Vec<u8>> =
-		image::ImageBuffer::from_fn(WIDTH as u32, HEIGHT as u32, |x, y| {
-			image::Rgb(final_image[(x + y * WIDTH as u32) as usize])
+		let sender = self.sender.clone();
+		config.launch_tiled(scene.clone(), (64, 64), move |tile| {
+			sender.send(serde_json::to_string(&tile).unwrap()).unwrap();
 		});
-	image.save("output.png").expect("Failed to save buffer to disk");
+
+		Ok(())
+	}
+
+	fn on_message(&mut self, msg: Message) -> Result<()> {
+		self.sender.send(msg)
+	}
+
+	fn on_error(&mut self, err: Error) {
+		println!("Error: {:?}", err);
+	}
+
+	fn on_close(&mut self, code: CloseCode, reason: &str) {
+		println!("Connection closed: {:?}, {}", code, reason);
+	}
+}
+
+fn main() {
+	listen("127.0.0.1:3012", |sender| Server { sender }).unwrap();
 }
