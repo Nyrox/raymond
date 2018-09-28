@@ -1,0 +1,21 @@
+{
+  "name": "raytracer-frontend",
+  "version": "0.1.0",
+  "description": "",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "repository": "",
+  "keywords": [],
+  "author": "Nyrox",
+  "license": "MIT",
+  "dependencies": {
+    "editor-frontend": "file:./frontend/pkg"
+  },
+  "devDependencies": {
+    "electron": "^2.0.0",
+    "electron-build-env": "^0.2",
+    "neon-cli": "*"
+  }
+}

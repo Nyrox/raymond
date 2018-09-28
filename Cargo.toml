@@ -22,3 +22,6 @@ members=[
 	"cli",
 	"server",
 ]
+exclude=[
+	"editor\\frontend"
+]
