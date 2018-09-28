@@ -4,6 +4,7 @@ use std::{
 	sync::{
 		mpsc::{self, Receiver, Sender},
 		Arc, RwLock,
+		atomic::{AtomicUsize, Ordering}
 	},
 	thread,
 };
@@ -62,17 +63,37 @@ pub enum Message {
 
 pub struct TaskHandle {
 	pub receiver: mpsc::Receiver<Message>,
-	settings: Settings,
+	pub settings: Settings,
+	alive_thread_count: Arc<AtomicUsize>,
 }
 
 impl TaskHandle {
 	pub fn await(&self) -> Vec<Vector3<f64>> {
-		let out = vec![
+		let mut out = vec![
 			Vector3::new(0.0, 0.0, 0.0);
 			self.settings.camera_settings.backbuffer_width * self.settings.camera_settings.backbuffer_height
 		];
-
 		
+		'collect: loop {
+			match self.receiver.recv() {
+				Ok(Message::TileFinished(tile)) => {
+					
+					for y in 0..tile.height {
+						for x in 0..tile.width {
+							let s = tile.data[x + y * tile.width] / tile.sample_count as f64;
+
+							out[x + tile.left + (y + tile.top) * self.settings.camera_settings.backbuffer_width] = s;
+						}
+					}
+
+					if self.alive_thread_count.load(Ordering::Relaxed) == 0 {
+						break 'collect;
+					}
+				},
+				Ok(_) => {},
+				Err(err) => {}
+			}
+		}
 
 		out
 	}
@@ -116,6 +137,7 @@ pub fn render_tiled(scene: Scene, settings: Settings) -> TaskHandle {
 		}
 	}
 
+	let thread_count = Arc::new(AtomicUsize::new(settings.worker_count));
 	for _ in 0..settings.worker_count {
 		let queue = queue.clone();
 		let sender = sender.clone();
@@ -127,8 +149,15 @@ pub fn render_tiled(scene: Scene, settings: Settings) -> TaskHandle {
 			settings: settings.clone(),
 		};
 
+		let thread_count = thread_count.clone();
 		thread::spawn(move || loop {
-			let mut tile = queue.try_pop()?;
+			let mut tile = match queue.try_pop() {
+				Some(t) => t,
+				None => {
+					thread_count.fetch_sub(1, Ordering::Relaxed);
+					return;
+				}
+			};
 
 			for y in tile.top..(tile.top + tile.height) {
 				for x in tile.left..(tile.left + tile.width) {
@@ -144,22 +173,25 @@ pub fn render_tiled(scene: Scene, settings: Settings) -> TaskHandle {
 
 			// Check if we are done
 			if tile.sample_count == context.settings.sample_count {
-				sender.send(Message::TileFinished(tile)).unwrap();
-				return Some(());
+				sender.send(Message::TileFinished(tile.clone())).unwrap();
 			}
+			else {
+				queue.push(tile.clone());
 
-			// Check if we want to send our tile down the pipe
+							// Check if we want to send our tile down the pipe
 			if context.settings.samples_per_iteration != 0
 				&& tile.sample_count % context.settings.samples_per_iteration == 0
 			{
 				sender.send(Message::TileProgressed(tile.clone())).unwrap();
 			}
+			}
 
-			queue.push(tile);
+
+
 		});
 	}
 
-	return TaskHandle { receiver, settings };
+	return TaskHandle { receiver, settings, alive_thread_count: thread_count };
 }
 
 fn trace(ray: Ray, context: &TraceContext, depth: usize) -> Vector3<F> {
