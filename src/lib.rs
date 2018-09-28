@@ -1,3 +1,5 @@
+#![feature(nll)]
+
 extern crate cgmath;
 extern crate crossbeam;
 extern crate crossbeam_utils;
@@ -9,6 +11,8 @@ extern crate rand;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
+#[macro_use]
+extern crate derive_builder;
 
 pub mod acc_grid;
 pub mod material;
@@ -16,6 +20,7 @@ pub mod mesh;
 pub mod primitives;
 pub mod scene;
 pub mod trace;
+pub mod transform;
 
 pub type F = f64;
 pub const F_MAX: F = ::std::f64::MAX;
@@ -52,5 +57,4 @@ pub mod prelude {
 	pub use mesh::Mesh;
 	pub use primitives::Plane;
 	pub use scene::{Model, Object, Scene};
-	pub use trace::RaytracerConfig;
 }

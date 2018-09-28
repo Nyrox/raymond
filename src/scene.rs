@@ -60,12 +60,44 @@ impl Model {
 }
 
 #[derive(Clone)]
+pub struct Light {
+	pub mesh: Arc<Mesh>,
+	pub intensity: Vector3<f64>,
+}
+
+#[derive(Clone)]
 pub struct Scene {
 	pub objects: Vec<Object>,
+	pub lights: Vec<Light>,
 }
 
 impl Scene {
 	pub fn new() -> Scene {
-		Scene { objects: Vec::new() }
+		Scene {
+			objects: Vec::new(),
+			lights: Vec::new(),
+		}
+	}
+
+	pub fn intersect(&self, ray: Ray) -> Option<(&Object, Hit)> {
+		let mut closest_distance = F_MAX;
+		let mut closest_object = None;
+
+		for (i, object) in self.objects.iter().enumerate() {
+			match object.intersects(ray) {
+				Some(hit) => {
+					if hit.distance < closest_distance {
+						closest_distance = hit.distance;
+						closest_object = Some((i, hit));
+					}
+				}
+				None => (),
+			}
+		}
+
+		match closest_object {
+			Some((o, h)) => return Some((&self.objects[o], h)),
+			_ => return None,
+		}
 	}
 }
