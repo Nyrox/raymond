@@ -1,12 +1,8 @@
 use std::{
-	default::Default,
-	f64, marker,
-	sync::{
-		mpsc::{self, Receiver, Sender},
-		Arc, RwLock,
-		atomic::{AtomicUsize, Ordering}
-	},
-	thread,
+	default::Default, f64, marker, sync::{
+		atomic::{AtomicUsize, Ordering}, mpsc::{self, Receiver, Sender, TryRecvError}, Arc, RwLock
+	}, thread,
+	time::Duration,
 };
 
 use crossbeam::{queue::MsQueue, thread::Scope};
@@ -17,10 +13,7 @@ use cgmath::*;
 use num_cpus;
 
 use super::{
-	material::Material,
-	primitives::{Hit, Plane, Ray},
-	scene::*,
-	transform::Transform,
+	material::Material, primitives::{Hit, Plane, Ray}, scene::*, transform::Transform
 };
 
 use super::{F, F_MAX, PI};
@@ -44,7 +37,7 @@ pub struct Settings {
 	pub sample_count: usize,
 	// The amount of samples per iteration
 	// If set to 0, the renderer will only notify the Receiver when a tile is fully rendered
-	#[builder(default="0")]
+	#[builder(default = "0")]
 	pub samples_per_iteration: usize,
 	pub tile_size: (usize, usize),
 	pub bounce_limit: usize,
@@ -71,28 +64,31 @@ impl TaskHandle {
 	pub fn await(&self) -> Vec<Vector3<f64>> {
 		let mut out = vec![
 			Vector3::new(0.0, 0.0, 0.0);
-			self.settings.camera_settings.backbuffer_width * self.settings.camera_settings.backbuffer_height
+			self.settings.camera_settings.backbuffer_width
+				* self.settings.camera_settings.backbuffer_height
 		];
-		
-		'collect: loop {
-			match self.receiver.recv() {
-				Ok(Message::TileFinished(tile)) => {
-					
-					for y in 0..tile.height {
-						for x in 0..tile.width {
-							let s = tile.data[x + y * tile.width] / tile.sample_count as f64;
 
-							out[x + tile.left + (y + tile.top) * self.settings.camera_settings.backbuffer_width] = s;
-						}
-					}
+		'poll: loop {
+			if self.alive_thread_count.load(Ordering::Relaxed) == 0 {
+				'collect: loop {
+					match self.receiver.try_recv() {
+						Ok(Message::TileFinished(tile)) => {
+							for y in 0..tile.height {
+								for x in 0..tile.width {
+									let s = tile.data[x + y * tile.width] / tile.sample_count as f64;
 
-					if self.alive_thread_count.load(Ordering::Relaxed) == 0 {
-						break 'collect;
+									out[x + tile.left
+									        + (y + tile.top) * self.settings.camera_settings.backbuffer_width] = s;
+								}
+							}
+						},
+						_ => { break 'collect; }
 					}
-				},
-				Ok(_) => {},
-				Err(err) => {}
+				}
+
+				break 'poll;
 			}
+			thread::sleep(Duration::from_millis(500));
 		}
 
 		out
@@ -111,8 +107,8 @@ pub fn render_tiled(scene: Scene, settings: Settings) -> TaskHandle {
 		'gen_tiles: loop {
 			let tile_min = (x, y);
 			let tile_max = (
-				(x + settings.tile_size.0).min(settings.camera_settings.backbuffer_width - 1),
-				(y + settings.tile_size.1).min(settings.camera_settings.backbuffer_height - 1),
+				(x + settings.tile_size.0).min(settings.camera_settings.backbuffer_width ),
+				(y + settings.tile_size.1).min(settings.camera_settings.backbuffer_height ),
 			);
 			let width = tile_max.0 - tile_min.0;
 			let height = tile_max.1 - tile_min.1;
@@ -174,24 +170,24 @@ pub fn render_tiled(scene: Scene, settings: Settings) -> TaskHandle {
 			// Check if we are done
 			if tile.sample_count == context.settings.sample_count {
 				sender.send(Message::TileFinished(tile.clone())).unwrap();
-			}
-			else {
+			} else {
 				queue.push(tile.clone());
 
-							// Check if we want to send our tile down the pipe
-			if context.settings.samples_per_iteration != 0
-				&& tile.sample_count % context.settings.samples_per_iteration == 0
-			{
-				sender.send(Message::TileProgressed(tile.clone())).unwrap();
+				// Check if we want to send our tile down the pipe
+				if context.settings.samples_per_iteration != 0
+					&& tile.sample_count % context.settings.samples_per_iteration == 0
+				{
+					sender.send(Message::TileProgressed(tile.clone())).unwrap();
+				}
 			}
-			}
-
-
-
 		});
 	}
 
-	return TaskHandle { receiver, settings, alive_thread_count: thread_count };
+	return TaskHandle {
+		receiver,
+		settings,
+		alive_thread_count: thread_count,
+	};
 }
 
 fn trace(ray: Ray, context: &TraceContext, depth: usize) -> Vector3<F> {
