@@ -14,10 +14,14 @@ num_cpus="*"
 serde="*"
 serde_json="*"
 serde_derive="*"
-
+futures="*"
+derive_builder="*"
 
 [workspace]
 members=[
 	"cli",
 	"server",
+]
+exclude=[
+	"editor\\frontend"
 ]
