@@ -1,6 +1,7 @@
-/target
+target/
 **/*.rs.bk
-
+dist/
+pkg/
 output.png
 /.vscode
 node_modules/

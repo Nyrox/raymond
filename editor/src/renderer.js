@@ -1,6 +1,11 @@
+const rust = import("../frontend/pkg/editor_frontend.js");
 
-let frontend = require("editor-frontend/editor_frontend.js");
-console.log(frontend);
+rust
+	.then((m) => {
+		console.log("god help us");
+		m.greet();
+	})
+	.catch(console.error);
 
 let canvas = document.querySelector("#frame");
 canvas.height = 340;
@@ -13,7 +18,6 @@ let cx = canvas.getContext("2d");
 // });
 
 window.rSocket = new WebSocket("ws://127.0.0.1:3012");
-
 
 rSocket.onmessage = (e) => {
 	let tile = JSON.parse(e.data);

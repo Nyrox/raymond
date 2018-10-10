@@ -10,7 +10,7 @@ function createWindow () {
   mainWindow = new BrowserWindow({width: 1400, height: 900})
 
   // and load the index.html of the app.
-  mainWindow.loadFile('index.html')
+  mainWindow.loadFile('dist/index.html')
 
   // Open the DevTools.
   // mainWindow.webContents.openDevTools()
@@ -21,7 +21,7 @@ function createWindow () {
     // in an array if your app supports multi windows, this is the time
     // when you should delete the corresponding element.
     mainWindow = null
-  })
+  });
 
   mainWindow.webContents.openDevTools();
 }
