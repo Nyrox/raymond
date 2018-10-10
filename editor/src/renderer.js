@@ -2,7 +2,7 @@ const rust = import("../frontend/pkg/editor_frontend.js");
 
 rust
 	.then((m) => {
-		console.log("god help us");
+		console.log("god help us please");
 		m.greet();
 	})
 	.catch(console.error);

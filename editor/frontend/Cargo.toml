@@ -6,6 +6,9 @@ authors = ["Nyrox <root@nyrox.tech>"]
 [lib]
 crate-type = ["cdylib"]
 
+[build]
+target="wasm32-unknown-unknown"
+
 [features]
 default-features = ["console_error_panic_hook", "wee_alloc"]
 

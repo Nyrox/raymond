@@ -1,12 +1,27 @@
 const path = require('path');
 
-module.exports = {
-  entry: './src/renderer.js',
-  output: {
-    filename: 'renderer.js',
-    path: path.resolve(__dirname, 'dist')
+const frontend = {
+  target: "electron-renderer",
+  entry: {
+    renderer: "./src/renderer.js"
   },
-  optimization: {
-    minimize: false
-  }
+  output: {
+    filename: "[name].js",
+    path: path.resolve(__dirname, "dist")
+  },
+  watch: true
 };
+
+const backend = {
+  target: "electron-main",
+  entry: {
+    main: "./src/main.js"
+  },
+  output: {
+    filename: "[name].js",
+    path: path.resolve(__dirname, "dist")
+  },
+  watch: true
+};
+
+module.exports=[backend, frontend];
