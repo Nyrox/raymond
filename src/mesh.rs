@@ -3,8 +3,7 @@ use std::{fs, path::PathBuf};
 use cgmath::*;
 
 use super::{
-	primitives::{Hit, Ray, SurfaceProperties, Triangle, Vertex, AABB},
-	F, F_MAX, PI,
+	primitives::{Hit, Ray, SurfaceProperties, Triangle, Vertex, AABB}, F, F_MAX, PI
 };
 
 #[derive(Debug)]

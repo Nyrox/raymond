@@ -6,25 +6,16 @@ extern crate image;
 extern crate raytracer;
 
 use raytracer::{
-	acc_grid,
-	material::Material,
-	mesh::Mesh,
-	primitives::Plane,
-	scene::{Object, Scene},
-	trace::*,
-	transform::Transform,
+	acc_grid, material::Material, mesh::Mesh, primitives::Plane, scene::{Object, Scene}, trace::*, transform::Transform
 };
 
 use cgmath::Vector3;
 use std::cell::RefCell;
 
 use std::{
-	path::PathBuf,
-	sync::{
-		atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT},
-		Arc, RwLock,
-	},
-	time::{Duration, Instant},
+	path::PathBuf, sync::{
+		atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT}, Arc, RwLock
+	}, time::{Duration, Instant}
 };
 
 static TRACE_COUNT: AtomicUsize = ATOMIC_USIZE_INIT;
@@ -113,7 +104,7 @@ fn main() {
 	let settings = SettingsBuilder::default()
 		.camera_settings(camera)
 		.sample_count(50)
-		.tile_size((32, 32))
+		.tile_size((16, 16))
 		.bounce_limit(5)
 		.build()
 		.unwrap();

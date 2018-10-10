@@ -3,8 +3,7 @@ use cgmath::{prelude::*, *};
 use super::F;
 
 use super::{
-	mesh::Mesh,
-	primitives::{Hit, Ray, SurfaceProperties, Triangle, AABB},
+	mesh::Mesh, primitives::{Hit, Ray, SurfaceProperties, Triangle, AABB}
 };
 
 const GRID_DENSITY_BIAS: F = 3.0;
@@ -108,7 +107,7 @@ impl AccGrid {
 			ray.direction.y.signum(),
 			ray.direction.z.signum(),
 		).cast::<i32>()
-			.unwrap();
+		.unwrap();
 
 		let t_delta_x = if ray.direction.x < 0.0 {
 			-self.cell_size.x
@@ -127,11 +126,14 @@ impl AccGrid {
 		} / ray.direction.z;
 
 		let mut t_max_x = (((current_cell.x + if ray.direction.x < 0.0 { 0 } else { 1 }) as f64 * self.cell_size.x)
-			- start.x) / ray.direction.x;
+			- start.x)
+			/ ray.direction.x;
 		let mut t_max_y = (((current_cell.y + if ray.direction.y < 0.0 { 0 } else { 1 }) as f64 * self.cell_size.y)
-			- start.y) / ray.direction.y;
+			- start.y)
+			/ ray.direction.y;
 		let mut t_max_z = (((current_cell.z + if ray.direction.z < 0.0 { 0 } else { 1 }) as f64 * self.cell_size.z)
-			- start.z) / ray.direction.z;
+			- start.z)
+			/ ray.direction.z;
 
 		loop {
 			let (x, y, z) = (
