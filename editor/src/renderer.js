@@ -1,5 +1,15 @@
 const rust = import("../frontend/pkg/editor_frontend.js");
 
+import Vue from "vue";
+import Test from "../templates/test.vue";
+
+var app = new Vue({
+	el: "#display",
+	template: '<Test />',
+	components: { Test }
+});
+
+
 rust
 	.then((m) => {
 		console.log("god help us please");
