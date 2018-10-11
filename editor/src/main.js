@@ -6,6 +6,8 @@ const {app, BrowserWindow} = require('electron')
 let mainWindow
 
 function createWindow () {
+  console.log(process.versions);
+  
   // Create the browser window.
   mainWindow = new BrowserWindow({width: 1400, height: 900})
 

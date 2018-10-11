@@ -9,11 +9,24 @@ var app = new Vue({
 	components: { Test }
 });
 
+let editor = null;
+function initialize() {
+	editor = wasm.create_editor();
 
+	window.requestAnimationFrame(update);
+}
+
+function update() {
+	wasm.update_editor(editor);
+
+	window.requestAnimationFrame(update);
+}
+
+let wasm;
 rust
 	.then((m) => {
-		console.log("god help us please");
-		m.greet();
+		wasm = m;
+		initialize();
 	})
 	.catch(console.error);
 
