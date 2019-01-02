@@ -1,7 +1,12 @@
 use std::{
-	default::Default, f64, marker, sync::{
-		atomic::{AtomicUsize, Ordering}, mpsc::{self, Receiver, Sender, TryRecvError}, Arc, RwLock
-	}, thread,
+	default::Default,
+	f64, marker,
+	sync::{
+		atomic::{AtomicUsize, Ordering},
+		mpsc::{self, Receiver, Sender, TryRecvError},
+		Arc, RwLock,
+	},
+	thread,
 	time::Duration,
 };
 
@@ -13,10 +18,15 @@ use cgmath::*;
 use num_cpus;
 
 use super::{
-	material::Material, primitives::{Hit, Plane, Ray}, scene::*, transform::Transform
+	material::Material,
+	primitives::{Hit, Plane, Ray},
+	scene::*,
+	transform::Transform,
 };
 
 use super::{F, F_MAX, PI};
+
+use log::{debug, error, info, log, trace, warn};
 
 #[derive(Builder, Clone, Debug)]
 pub struct CameraSettings {
@@ -54,18 +64,24 @@ pub enum Message {
 	TileProgressed(super::Tile),
 }
 
+pub type TileCallback = Box<Fn(super::Tile) -> ()>;
+
 pub struct TaskHandle {
 	pub receiver: mpsc::Receiver<Message>,
 	pub settings: Settings,
+	callback: Option<TileCallback>,
 	alive_thread_count: Arc<AtomicUsize>,
 }
 
 impl TaskHandle {
-	pub fn await(&self) -> Vec<Vector3<f64>> {
+	pub fn set_callback(&mut self, callback: Option<TileCallback>) {
+		self.callback = callback;
+	}
+
+	pub fn r#await(&self) -> Vec<Vector3<f64>> {
 		let mut out = vec![
 			Vector3::new(0.0, 0.0, 0.0);
-			self.settings.camera_settings.backbuffer_width
-				* self.settings.camera_settings.backbuffer_height
+			self.settings.camera_settings.backbuffer_width * self.settings.camera_settings.backbuffer_height
 		];
 
 		'poll: loop {
@@ -77,12 +93,13 @@ impl TaskHandle {
 								for x in 0..tile.width {
 									let s = tile.data[x + y * tile.width] / tile.sample_count as f64;
 
-									out[x + tile.left
-									        + (y + tile.top) * self.settings.camera_settings.backbuffer_width] = s;
+									out[x + tile.left + (y + tile.top) * self.settings.camera_settings.backbuffer_width] = s;
 								}
 							}
-						},
-						_ => { break 'collect; }
+						}
+						_ => {
+							break 'collect;
+						}
 					}
 				}
 
@@ -92,6 +109,23 @@ impl TaskHandle {
 		}
 
 		out
+	}
+
+	pub fn async_await(&self) -> () {
+		'collect: loop {
+			match self.receiver.try_recv() {
+				Ok(Message::TileProgressed(tile)) => {
+					println!("CB");
+					if let Some(cb) = &self.callback {
+						cb(tile);
+					}
+				}
+				_ => {
+					break 'collect;
+				}
+			}
+			thread::sleep(Duration::from_millis(200));
+		}
 	}
 }
 
@@ -107,8 +141,8 @@ pub fn render_tiled(scene: Scene, settings: Settings) -> TaskHandle {
 		'gen_tiles: loop {
 			let tile_min = (x, y);
 			let tile_max = (
-				(x + settings.tile_size.0).min(settings.camera_settings.backbuffer_width ),
-				(y + settings.tile_size.1).min(settings.camera_settings.backbuffer_height ),
+				(x + settings.tile_size.0).min(settings.camera_settings.backbuffer_width),
+				(y + settings.tile_size.1).min(settings.camera_settings.backbuffer_height),
 			);
 			let width = tile_max.0 - tile_min.0;
 			let height = tile_max.1 - tile_min.1;
@@ -166,6 +200,7 @@ pub fn render_tiled(scene: Scene, settings: Settings) -> TaskHandle {
 			}
 
 			tile.sample_count += 1;
+			info!(target: "TraceCore", "Tile[{:4}, {:4}] finished sample [{}]", tile.left, tile.top, tile.sample_count);
 
 			// Check if we are done
 			if tile.sample_count == context.settings.sample_count {
@@ -174,9 +209,7 @@ pub fn render_tiled(scene: Scene, settings: Settings) -> TaskHandle {
 				queue.push(tile.clone());
 
 				// Check if we want to send our tile down the pipe
-				if context.settings.samples_per_iteration != 0
-					&& tile.sample_count % context.settings.samples_per_iteration == 0
-				{
+				if context.settings.samples_per_iteration != 0 && tile.sample_count % context.settings.samples_per_iteration == 0 {
 					sender.send(Message::TileProgressed(tile.clone())).unwrap();
 				}
 			}
@@ -187,6 +220,7 @@ pub fn render_tiled(scene: Scene, settings: Settings) -> TaskHandle {
 		receiver,
 		settings,
 		alive_thread_count: thread_count,
+		callback: None,
 	};
 }
 

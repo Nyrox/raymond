@@ -28,7 +28,7 @@ pub const PI: F = ::std::f64::consts::PI;
 
 pub use cgmath::Vector3;
 
-#[derive(Clone, Serialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Tile {
 	pub sample_count: usize,
 	pub width: usize,
@@ -51,10 +51,12 @@ impl fmt::Debug for Tile {
 }
 
 pub mod prelude {
-	pub use acc_grid::AccGrid;
-	pub use cgmath::Vector3;
-	pub use material::Material;
-	pub use mesh::Mesh;
-	pub use primitives::Plane;
-	pub use scene::{Model, Object, Scene};
+	pub use crate::{
+		acc_grid::AccGrid,
+		cgmath::Vector3,
+		material::Material,
+		mesh::Mesh,
+		primitives::Plane,
+		scene::{Model, Object, Scene},
+	};
 }

@@ -2,6 +2,7 @@
 name = "server"
 version = "0.1.0"
 authors = ["Nyrox <mark.oliver@hotmail.de>"]
+edition="2018"
 
 [dependencies]
 raytracer={ path="../" }
@@ -10,3 +11,5 @@ cgmath="*"
 ws="*"
 serde="*"
 serde_json="*"
+simplelog="*"
+log="*"

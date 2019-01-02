@@ -5,7 +5,10 @@ use cgmath::{prelude::*, *};
 use super::{F, F_MAX, PI};
 
 use super::{
-	acc_grid, material::Material, mesh::Mesh, primitives::{Hit, Plane, Ray, SurfaceProperties, Triangle, AABB}
+	acc_grid,
+	material::Material,
+	mesh::Mesh,
+	primitives::{Hit, Plane, Ray, SurfaceProperties, Triangle, AABB},
 };
 
 #[derive(Clone)]

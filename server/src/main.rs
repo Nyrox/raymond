@@ -1,22 +1,78 @@
-extern crate raytracer;
-extern crate ws;
-#[macro_use]
-extern crate serde;
-extern crate serde_json;
+use raytracer::{
+	acc_grid,
+	material::Material,
+	mesh::Mesh,
+	primitives::Plane,
+	scene::{Object, Scene},
+	trace::{*, Message},
+	transform::Transform,
+};
 
-use raytracer::{prelude::*, *};
-use ws::*;
+use cgmath::Vector3;
 
 use std::{path::PathBuf, sync::Arc};
+use log::info;
 
-struct Server {
-	sender: Sender,
+use std::{
+	fs::File,
+	sync::{
+		atomic::{AtomicBool, AtomicUsize, Ordering},
+		mpsc,
+	},
+	time::Duration,
+};
+
+pub mod protocol;
+use crate::protocol::*;
+
+pub trait TaskHandle {
+	fn finished(&self) -> bool;
+	fn await_finish(&self);
+	fn stop(&mut self);
+	fn poll_message(&mut self) -> Option<Message>;
 }
 
-impl Handler for Server {
-	fn on_open(&mut self, _: Handshake) -> Result<()> {
-		println!("Connection established.");
+pub struct RenderTaskHandle {
+	receiver: mpsc::Receiver<Message>,
+	abort_flag: Arc<AtomicBool>,
+	alive_thread_count: Arc<AtomicUsize>,
+}
 
+impl TaskHandle for RenderTaskHandle {
+	fn finished(&self) -> bool {
+		self.alive_thread_count.load(Ordering::Relaxed) <= 0
+	}
+
+	fn await_finish(&self) {
+		while !self.finished() {
+			std::thread::sleep(Duration::from_millis(200));
+		}
+	}
+
+	fn stop(&mut self) {
+		self.abort_flag.store(true, Ordering::SeqCst);
+	}
+
+	fn poll_message(&mut self) -> Option<Message> {
+		self.receiver.try_recv().ok()
+	}
+}
+
+use std::{
+	io::prelude::*,
+	net::{self, TcpListener, TcpStream},
+};
+
+fn main() {
+	use simplelog::*;
+	CombinedLogger::init(vec![WriteLogger::new(
+		LevelFilter::Info,
+		Config::default(),
+		File::create("trace.log").unwrap(),
+	)])
+	.unwrap();
+
+	let scene = {
 		let mut scene = Scene::new();
 		let mut sphere_mesh = Mesh::load_ply(PathBuf::from("assets/meshes/ico_sphere.ply"));
 
@@ -78,40 +134,51 @@ impl Handler for Server {
 			material: Material::Diffuse(Vector3::new(0.0, 0.0, 0.0), 0.9),
 		}));
 
-		let WIDTH = 400;
-		let HEIGHT = 340;
+		scene
+	};
 
-		let config = RaytracerConfig {
-			width: WIDTH,
-			height: HEIGHT,
-			fov: 50.0,
-			num_samples: 500,
-			max_bounces: 5,
+	let HEIGHT = 340;
+	let WIDTH = HEIGHT / 9 * 16;
 
-			..RaytracerConfig::default()
-		};
+	let camera = CameraSettingsBuilder::default()
+		.backbuffer_width(WIDTH)
+		.backbuffer_height(HEIGHT)
+		.fov_vert(55.0)
+		.transform(Transform::identity())
+		.focal_length(2.5)
+		.aperture_radius(0.5)
+		.build()
+		.unwrap();
 
-		let sender = self.sender.clone();
-		config.launch_tiled(scene.clone(), (64, 64), move |tile| {
-			sender.send(serde_json::to_string(&tile).unwrap()).unwrap();
+	let settings = SettingsBuilder::default()
+		.camera_settings(camera)
+		.sample_count(50)
+		.tile_size((16, 16))
+		.bounce_limit(5)
+		.build()
+		.unwrap();
+
+	println!("{}", serde_json::to_string(&protocol::Message::TileProgressed(raytracer::Tile {
+		left: 15, top: 42, width: 12, height: 18, sample_count: 15, data: vec![]
+	})).unwrap());
+
+	let listener = TcpListener::bind("127.0.0.1:17025").unwrap();
+	for stream in listener.incoming() {
+		let mut stream = stream.unwrap();
+		info!("New connection accepeted.");
+
+		std::thread::spawn(move || {
+			stream.write(b"Hello World").unwrap();
+
+			loop {
+				let mut buf = vec![0; 256];
+				let result = stream.read(&mut buf).unwrap();
+
+					println!("{:?}", buf);
+				if result > 0 {
+					info!("Received data: {:?}", buf);
+				}
+			}
 		});
-
-		Ok(())
 	}
-
-	fn on_message(&mut self, msg: Message) -> Result<()> {
-		self.sender.send(msg)
-	}
-
-	fn on_error(&mut self, err: Error) {
-		println!("Error: {:?}", err);
-	}
-
-	fn on_close(&mut self, code: CloseCode, reason: &str) {
-		println!("Connection closed: {:?}, {}", code, reason);
-	}
-}
-
-fn main() {
-	listen("127.0.0.1:3012", |sender| Server { sender }).unwrap();
 }

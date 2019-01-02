@@ -3,7 +3,8 @@ use cgmath::{prelude::*, *};
 use super::F;
 
 use super::{
-	mesh::Mesh, primitives::{Hit, Ray, SurfaceProperties, Triangle, AABB}
+	mesh::Mesh,
+	primitives::{Hit, Ray, SurfaceProperties, Triangle, AABB},
 };
 
 const GRID_DENSITY_BIAS: F = 3.0;
@@ -102,12 +103,9 @@ impl AccGrid {
 			start = outer_hit_position - self.mesh.bounding_box.min;
 			current_cell = start.div_element_wise(self.cell_size).cast::<i32>().unwrap();
 		}
-		let step = Vector3::new(
-			ray.direction.x.signum(),
-			ray.direction.y.signum(),
-			ray.direction.z.signum(),
-		).cast::<i32>()
-		.unwrap();
+		let step = Vector3::new(ray.direction.x.signum(), ray.direction.y.signum(), ray.direction.z.signum())
+			.cast::<i32>()
+			.unwrap();
 
 		let t_delta_x = if ray.direction.x < 0.0 {
 			-self.cell_size.x
@@ -125,22 +123,15 @@ impl AccGrid {
 			self.cell_size.z
 		} / ray.direction.z;
 
-		let mut t_max_x = (((current_cell.x + if ray.direction.x < 0.0 { 0 } else { 1 }) as f64 * self.cell_size.x)
-			- start.x)
-			/ ray.direction.x;
-		let mut t_max_y = (((current_cell.y + if ray.direction.y < 0.0 { 0 } else { 1 }) as f64 * self.cell_size.y)
-			- start.y)
-			/ ray.direction.y;
-		let mut t_max_z = (((current_cell.z + if ray.direction.z < 0.0 { 0 } else { 1 }) as f64 * self.cell_size.z)
-			- start.z)
-			/ ray.direction.z;
+		let mut t_max_x =
+			(((current_cell.x + if ray.direction.x < 0.0 { 0 } else { 1 }) as f64 * self.cell_size.x) - start.x) / ray.direction.x;
+		let mut t_max_y =
+			(((current_cell.y + if ray.direction.y < 0.0 { 0 } else { 1 }) as f64 * self.cell_size.y) - start.y) / ray.direction.y;
+		let mut t_max_z =
+			(((current_cell.z + if ray.direction.z < 0.0 { 0 } else { 1 }) as f64 * self.cell_size.z) - start.z) / ray.direction.z;
 
 		loop {
-			let (x, y, z) = (
-				current_cell.x as usize,
-				current_cell.y as usize,
-				current_cell.z as usize,
-			);
+			let (x, y, z) = (current_cell.x as usize, current_cell.y as usize, current_cell.z as usize);
 			if x + self.resolution.x * (y + z * self.resolution.z) >= self.cells.len() {
 				return None;
 			}

@@ -2,6 +2,7 @@
 name = "raytracer"
 version = "0.1.0"
 authors = ["Nyrox <root@nyrox.tech>"]
+edition="2018" 
 
 [dependencies]
 cgmath={version="*", features=["serde"]}
@@ -16,6 +17,9 @@ serde_json="*"
 serde_derive="*"
 futures="*"
 derive_builder="*"
+simplelog="*"
+log="*"
+
 
 [workspace]
 members=[

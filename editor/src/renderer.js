@@ -1,5 +1,3 @@
-const rust = import("../frontend/pkg/editor_frontend.js");
-
 import Vue from "vue";
 import Test from "../templates/test.vue";
 
@@ -8,27 +6,6 @@ var app = new Vue({
 	template: '<Test />',
 	components: { Test }
 });
-
-let editor = null;
-function initialize() {
-	editor = wasm.create_editor();
-
-	window.requestAnimationFrame(update);
-}
-
-function update() {
-	wasm.update_editor(editor);
-
-	window.requestAnimationFrame(update);
-}
-
-let wasm;
-rust
-	.then((m) => {
-		wasm = m;
-		initialize();
-	})
-	.catch(console.error);
 
 let canvas = document.querySelector("#frame");
 canvas.height = 340;
@@ -43,6 +20,7 @@ let cx = canvas.getContext("2d");
 window.rSocket = new WebSocket("ws://127.0.0.1:3012");
 
 rSocket.onmessage = (e) => {
+	console.log(message);
 	let tile = JSON.parse(e.data);
 
 	for (let i = 0; i < tile.width; i++) {

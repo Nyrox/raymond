@@ -6,17 +6,28 @@ extern crate image;
 extern crate raytracer;
 
 use raytracer::{
-	acc_grid, material::Material, mesh::Mesh, primitives::Plane, scene::{Object, Scene}, trace::*, transform::Transform
+	acc_grid,
+	material::Material,
+	mesh::Mesh,
+	primitives::Plane,
+	scene::{Object, Scene},
+	trace::*,
+	transform::Transform,
 };
 
 use cgmath::Vector3;
 use std::cell::RefCell;
 
 use std::{
-	path::PathBuf, sync::{
-		atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT}, Arc, RwLock
-	}, time::{Duration, Instant}
+	path::PathBuf,
+	sync::{
+		atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT},
+		Arc, RwLock,
+	},
+	time::{Duration, Instant},
 };
+
+use std::fs::File;
 
 static TRACE_COUNT: AtomicUsize = ATOMIC_USIZE_INIT;
 static SHADOW_RAY_COUNT: AtomicUsize = ATOMIC_USIZE_INIT;
@@ -24,6 +35,13 @@ static SHADOW_TOTAL_TIME: AtomicUsize = ATOMIC_USIZE_INIT;
 
 fn main() {
 	let now = Instant::now();
+
+	use simplelog::*;
+	CombinedLogger::init(vec![WriteLogger::new(
+		LevelFilter::Info,
+		Config::default(),
+		File::create("trace.log").unwrap(),
+	)]);
 
 	let mut scene = Scene::new();
 	let mut sphere_mesh = Mesh::load_ply(PathBuf::from("assets/meshes/ico_sphere.ply"));
@@ -103,14 +121,14 @@ fn main() {
 
 	let settings = SettingsBuilder::default()
 		.camera_settings(camera)
-		.sample_count(50)
+		.sample_count(5)
 		.tile_size((16, 16))
-		.bounce_limit(5)
+		.bounce_limit(6)
 		.build()
 		.unwrap();
 
 	let task_handle = render_tiled(scene, settings);
-	let render = task_handle.await();
+	let render = task_handle.r#await();
 
 	let final_image = render;
 
@@ -140,19 +158,19 @@ fn main() {
 		};
 	}
 
-	println!("Finished render.\nTotal render time: {}s\nTotal amount of trace calls: {}\nTotal amount of shadow rays cast: {}\n",
-        (Instant::now() - now).as_millis() as f32 / 1000.0,
-        TRACE_COUNT.load(Ordering::Relaxed),
-        SHADOW_RAY_COUNT.load(Ordering::Relaxed),
-    );
+	println!(
+		"Finished render.\nTotal render time: {}s\nTotal amount of trace calls: {}\nTotal amount of shadow rays cast: {}\n",
+		(Instant::now() - now).as_millis() as f32 / 1000.0,
+		TRACE_COUNT.load(Ordering::Relaxed),
+		SHADOW_RAY_COUNT.load(Ordering::Relaxed),
+	);
 	println!(
 		"Total time spent on shadow rays: {}s",
 		SHADOW_TOTAL_TIME.load(Ordering::Relaxed) as f32 / 1000.0 / 1000.0 / 1000.0
 	);
 
-	let image: image::ImageBuffer<image::Rgb<u8>, Vec<u8>> =
-		image::ImageBuffer::from_fn(WIDTH as u32, HEIGHT as u32, |x, y| {
-			image::Rgb(export[(x + y * WIDTH as u32) as usize].into())
-		});
+	let image: image::ImageBuffer<image::Rgb<u8>, Vec<u8>> = image::ImageBuffer::from_fn(WIDTH as u32, HEIGHT as u32, |x, y| {
+		image::Rgb(export[(x + y * WIDTH as u32) as usize].into())
+	});
 	image.save("output.png").expect("Failed to save buffer to disk");
 }
