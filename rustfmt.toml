@@ -1,0 +1,9 @@
+
+max_width=140
+comment_width=140
+hard_tabs=true
+
+imports_layout="Mixed"
+merge_imports=true
+
+reorder_impl_items=true

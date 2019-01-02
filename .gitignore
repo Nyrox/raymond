@@ -1,5 +1,12 @@
-/target
+target/
 **/*.rs.bk
-Cargo.lock
+dist/
+pkg/
 output.png
 /.vscode
+node_modules/
+package-lock.json
+Cargo.lock
+pkg/
+bin/
+*.log

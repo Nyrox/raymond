@@ -1,12 +1,31 @@
 [package]
-name = "raytracer-rs"
+name = "raytracer"
 version = "0.1.0"
 authors = ["Nyrox <root@nyrox.tech>"]
+edition="2018" 
 
 [dependencies]
-cgmath="*"
+cgmath={version="*", features=["serde"]}
 image="*"
 num-traits="*"
 rand="*"
 crossbeam-utils="0.5.0"
+crossbeam="*"
 num_cpus="*"
+serde="*"
+serde_json="*"
+serde_derive="*"
+futures="*"
+derive_builder="*"
+simplelog="*"
+log="*"
+
+
+[workspace]
+members=[
+	"cli",
+	"server",
+]
+exclude=[
+	"editor\\frontend"
+]
