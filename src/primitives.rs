@@ -215,3 +215,40 @@ impl Plane {
 		SurfaceProperties { normal: self.normal }
 	}
 }
+
+
+#[derive(Clone)]
+pub struct Sphere {
+    pub origin: Vector3<F>,
+    pub radius: F,
+    pub material: Material,
+}
+
+impl Sphere {
+    pub fn get_material(&self) -> Material {
+        self.material.clone()
+    }
+    
+    pub fn intersects(&self, ray: Ray) -> Option<Hit> {
+        let c = self.origin - ray.origin;
+        let mut t = c.dot(ray.direction);
+        let q = c - t * ray.direction;
+        let p = q.dot(q);
+        
+        if p > self.radius * self.radius {
+            return None;
+        }
+
+        t -= (self.radius * self.radius - p).sqrt();
+        if t <= 0.0 { return None; }
+        
+        let hit_pos = ray.origin + ray.direction * t;
+        return Some(Hit::new(ray, t));
+    }
+
+    pub fn get_surface_properties(&self, hit: Hit) -> SurfaceProperties {
+        SurfaceProperties {
+            normal: ((hit.ray.origin + hit.ray.direction * hit.distance) - self.origin).normalize()
+        }
+    }
+}

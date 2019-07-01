@@ -1,12 +1,5 @@
-#![feature(nll)]
 
-extern crate cgmath;
-extern crate crossbeam;
-extern crate crossbeam_utils;
-extern crate image;
-extern crate num_cpus;
-extern crate num_traits;
-extern crate rand;
+
 #[macro_use]
 extern crate serde;
 #[macro_use]
@@ -26,6 +19,7 @@ pub type F = f64;
 pub const F_MAX: F = ::std::f64::MAX;
 pub const PI: F = ::std::f64::consts::PI;
 
+extern crate cgmath;
 pub use cgmath::Vector3;
 
 #[derive(Clone, Serialize, Deserialize)]

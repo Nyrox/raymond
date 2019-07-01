@@ -8,13 +8,14 @@ use super::{
 	acc_grid,
 	material::Material,
 	mesh::Mesh,
-	primitives::{Hit, Plane, Ray, SurfaceProperties, Triangle, AABB},
+	primitives::{Hit, Plane, Sphere, Ray, SurfaceProperties, Triangle, AABB},
 };
 
 #[derive(Clone)]
 pub enum Object {
 	Plane(Plane),
 	Model(Model),
+	Sphere(Sphere),
 	Grid(Arc<acc_grid::AccGrid>, Material),
 }
 
@@ -23,6 +24,7 @@ impl Object {
 		match self {
 			&Object::Plane(ref p) => &p.material,
 			&Object::Model(ref m) => &m.material,
+			&Object::Sphere(ref s) => &s.material,
 			&Object::Grid(ref g, ref m) => m,
 		}
 	}
@@ -31,6 +33,7 @@ impl Object {
 		match self {
 			&Object::Plane(ref p) => p.intersects(ray),
 			&Object::Model(ref m) => m.intersects(ray),
+			&Object::Sphere(ref s) => s.intersects(ray),
 			&Object::Grid(ref g, _) => g.intersects(ray),
 		}
 	}
@@ -39,6 +42,7 @@ impl Object {
 		match self {
 			&Object::Plane(ref p) => p.get_surface_properties(hit),
 			&Object::Model(ref m) => m.get_surface_properties(hit),
+			&Object::Sphere(ref s) => s.get_surface_properties(hit),
 			&Object::Grid(ref g, _) => g.get_surface_properties(hit),
 		}
 	}
