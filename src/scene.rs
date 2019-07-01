@@ -1,15 +1,14 @@
 use std::sync::Arc;
 
-use cgmath::{prelude::*, *};
-
-use super::{F, F_MAX, PI};
+use super::{F_MAX, PI};
 
 use super::{
 	acc_grid,
-	material::Material,
 	mesh::Mesh,
-	primitives::{Hit, Plane, Sphere, Ray, SurfaceProperties, Triangle, AABB},
 };
+
+use core::prelude::*;
+use core::primitives::{Plane, Sphere, Triangle};
 
 #[derive(Clone)]
 pub enum Object {
@@ -66,7 +65,7 @@ impl Model {
 #[derive(Clone)]
 pub struct Light {
 	pub mesh: Arc<Mesh>,
-	pub intensity: Vector3<f64>,
+	pub intensity: Vector3,
 }
 
 #[derive(Clone)]

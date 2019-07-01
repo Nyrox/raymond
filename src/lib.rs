@@ -8,19 +8,17 @@ extern crate serde_derive;
 extern crate derive_builder;
 
 pub mod acc_grid;
-pub mod material;
 pub mod mesh;
-pub mod primitives;
 pub mod scene;
 pub mod trace;
 pub mod transform;
 
-pub type F = f64;
-pub const F_MAX: F = ::std::f64::MAX;
-pub const PI: F = ::std::f64::consts::PI;
+pub const F_MAX: f64 = ::std::f64::MAX;
+pub const PI: f64 = ::std::f64::consts::PI;
 
 extern crate cgmath;
-pub use cgmath::Vector3;
+
+use core::prelude::*;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Tile {
@@ -29,7 +27,7 @@ pub struct Tile {
 	pub height: usize,
 	pub left: usize,
 	pub top: usize,
-	pub data: Vec<cgmath::Vector3<F>>,
+	pub data: Vec<Vector3>,
 }
 
 use std::fmt;
@@ -48,9 +46,7 @@ pub mod prelude {
 	pub use crate::{
 		acc_grid::AccGrid,
 		cgmath::Vector3,
-		material::Material,
 		mesh::Mesh,
-		primitives::Plane,
 		scene::{Model, Object, Scene},
 	};
 }

@@ -1,21 +1,20 @@
-use cgmath::{prelude::*, *};
-
-use super::F;
 
 use super::{
 	mesh::Mesh,
-	primitives::{Hit, Ray, SurfaceProperties, Triangle, AABB},
 };
 
-const GRID_DENSITY_BIAS: F = 3.0;
+use core::prelude::*;
+use core::primitives::{Triangle, AABB};
 
-fn estimate_grid_resolution(bounds: &AABB, triangle_count: usize) -> Vector3<usize> {
+const GRID_DENSITY_BIAS: f64 = 3.0;
+
+fn estimate_grid_resolution(bounds: &AABB, triangle_count: usize) -> cgmath::Vector3<usize> {
 	let size = bounds.max - bounds.min;
 	let volume = (size.x * size.y * size.z).abs();
 
-	let triangle_density = ((GRID_DENSITY_BIAS * triangle_count as F) / volume).powf(1.0 / 3.0);
+	let triangle_density = ((GRID_DENSITY_BIAS * triangle_count as f64) / volume).powf(1.0 / 3.0);
 
-	return Vector3::new(
+	return cgmath::Vector3::new(
 		(size.x.abs() * triangle_density) as usize,
 		(size.y.abs() * triangle_density) as usize,
 		(size.z.abs() * triangle_density) as usize,
@@ -34,14 +33,14 @@ pub struct AccGrid {
 	pub cells: Vec<Cell>,
 	pub mesh: Mesh,
 	pub mapping_table: Vec<usize>,
-	pub resolution: Vector3<usize>,
-	pub cell_size: Vector3<F>,
+	pub resolution: cgmath::Vector3<usize>,
+	pub cell_size: Vector3,
 }
 
 impl AccGrid {
 	pub fn build_from_mesh(mesh: Mesh) -> AccGrid {
 		let grid_res = estimate_grid_resolution(&mesh.bounding_box, mesh.triangles.len());
-		let cell_size = (mesh.bounding_box.max - mesh.bounding_box.min).div_element_wise(grid_res.cast::<F>().unwrap());
+		let cell_size = (mesh.bounding_box.max - mesh.bounding_box.min).div_element_wise(grid_res.cast::<f64>().unwrap());
 		let mut naive_cells = vec![NaiveCell(Vec::new()); grid_res.x * grid_res.y * grid_res.z];
 		let mut mapping_table: Vec<usize> = Vec::new();
 

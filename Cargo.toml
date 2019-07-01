@@ -20,11 +20,13 @@ derive_builder="*"
 simplelog="*"
 log="*"
 
+core={path="./core"}
 
 [workspace]
 members=[
 	"cli",
 	"server",
+	"core",
 ]
 exclude=[
 	"editor\\frontend"

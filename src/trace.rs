@@ -10,23 +10,22 @@ use std::{
 	time::Duration,
 };
 
-use crossbeam::{queue::MsQueue, thread::Scope};
-use crossbeam_utils;
+use crossbeam::{queue::MsQueue};
 use rand;
 
-use cgmath::*;
 use num_cpus;
 
 use super::{
-	material::Material,
-	primitives::{Hit, Plane, Ray},
 	scene::*,
 	transform::Transform,
 };
 
-use super::{F, F_MAX, PI};
+use core::prelude::*;
+use core::primitives::Plane;
 
-use log::{debug, error, info, log, trace, warn};
+use super::{PI};
+
+use log::*;
 
 #[derive(Builder, Clone, Debug)]
 pub struct CameraSettings {
@@ -78,7 +77,7 @@ impl TaskHandle {
 		self.callback = callback;
 	}
 
-	pub fn r#await(&self) -> Vec<Vector3<f64>> {
+	pub fn r#await(&self) -> Vec<Vector3> {
 		let mut out = vec![
 			Vector3::new(0.0, 0.0, 0.0);
 			self.settings.camera_settings.backbuffer_width * self.settings.camera_settings.backbuffer_height
@@ -224,7 +223,7 @@ pub fn render_tiled(scene: Scene, settings: Settings) -> TaskHandle {
 	};
 }
 
-fn trace(ray: Ray, context: &TraceContext, depth: usize) -> Vector3<F> {
+fn trace(ray: Ray, context: &TraceContext, depth: usize) -> Vector3 {
 	let settings = &context.settings;
 
 	if depth > settings.bounce_limit {
@@ -254,9 +253,9 @@ fn trace(ray: Ray, context: &TraceContext, depth: usize) -> Vector3<F> {
 	let f0 = Vector3::new(0.04, 0.04, 0.04);
 	let f0 = lerp_vec(f0, *material_color, material_metalness);
 	// Decide whether to sample diffuse or specular
-	let r = rand::random::<F>();
+	let r = rand::random::<f64>();
 	let local_cartesian = create_coordinate_system_of_n(normal);
-	let local_cartesian_transform = Matrix3::from_cols(local_cartesian.0, normal, local_cartesian.1);
+	let local_cartesian_transform = cgmath::Matrix3::from_cols(local_cartesian.0, normal, local_cartesian.1);
 	let prob_d = lerp(0.5, 0.0, material_metalness);
 	if r < prob_d {
 		let (sample, pdf) = uniform_sample_hemisphere();
@@ -280,15 +279,15 @@ fn trace(ray: Ray, context: &TraceContext, depth: usize) -> Vector3<F> {
 	} else {
 		// Sample specular
 		let reflect = (-view_dir - 2.0 * (-view_dir.dot(normal) * normal)).normalize();
-		fn importance_sample_ggx(reflect: Vector3<F>, roughness: F) -> Vector3<F> {
-			let r1: F = rand::random();
-			let r2: F = rand::random();
+		fn importance_sample_ggx(reflect: Vector3, roughness: f64) -> Vector3 {
+			let r1: f64 = rand::random();
+			let r2: f64 = rand::random();
 			let a = roughness * roughness;
 			let phi = 2.0 * PI * r1;
 			let theta = a * (r2 / (1.0 - r2)).sqrt();
 			let h = Vector3::new(theta.sin() * phi.cos(), theta.cos(), theta.sin() * phi.sin());
 			let (tangent, bitangent) = create_coordinate_system_of_n(reflect);
-			let matrix = Matrix3::from_cols(tangent, reflect, bitangent);
+			let matrix = cgmath::Matrix3::from_cols(tangent, reflect, bitangent);
 			return (matrix * h).normalize();
 		}
 		let sample_world = importance_sample_ggx(reflect, material_roughness);
@@ -317,14 +316,14 @@ fn trace(ray: Ray, context: &TraceContext, depth: usize) -> Vector3<F> {
 }
 
 fn generate_primary_ray(x: usize, y: usize, camera: &CameraSettings) -> Ray {
-	let width = camera.backbuffer_width as F;
-	let height = camera.backbuffer_height as F;
+	let width = camera.backbuffer_width as f64;
+	let height = camera.backbuffer_height as f64;
 	let aspect = width / height;
-	let x = x as F + (rand::random::<F>() - 0.5);
-	let y = y as F + (rand::random::<F>() - 0.5);
+	let x = x as f64 + (rand::random::<f64>() - 0.5);
+	let y = y as f64 + (rand::random::<f64>() - 0.5);
 
-	let px = (2.0 * ((x + 0.5) / width) - 1.0) * F::tan(camera.fov_vert / 2.0 * PI / 180.0) * aspect;
-	let py = (1.0 - 2.0 * ((y + 0.5) / height)) * F::tan(camera.fov_vert / 2.0 * PI / 180.0);
+	let px = (2.0 * ((x + 0.5) / width) - 1.0) * f64::tan(camera.fov_vert / 2.0 * PI / 180.0) * aspect;
+	let py = (1.0 - 2.0 * ((y + 0.5) / height)) * f64::tan(camera.fov_vert / 2.0 * PI / 180.0);
 
 	Ray::new(camera.transform.position, Vector3::new(px, py, 1.0).normalize())
 }
@@ -334,8 +333,8 @@ fn generate_primary_ray_with_dof(x: usize, y: usize, camera: &CameraSettings) ->
 
 	// chose random point on the aperture, through rejection sampling
 	let start = loop {
-		let r1 = rand::random::<F>() * 2.0 - 1.0;
-		let r2 = rand::random::<F>() * 2.0 - 1.0;
+		let r1 = rand::random::<f64>() * 2.0 - 1.0;
+		let r2 = rand::random::<f64>() * 2.0 - 1.0;
 		let ax = camera.transform.position.x + r1 * camera.aperture_radius;
 		let ay = camera.transform.position.y + r2 * camera.aperture_radius;
 		let _start = Vector3::new(ax, ay, camera.transform.position.z);
@@ -357,7 +356,7 @@ fn generate_primary_ray_with_dof(x: usize, y: usize, camera: &CameraSettings) ->
 	};
 }
 
-fn ggx_distribution(n: Vector3<F>, h: Vector3<F>, roughness: F) -> F {
+fn ggx_distribution(n: Vector3, h: Vector3, roughness: f64) -> f64 {
 	let a2 = roughness * roughness;
 	let NdotH = n.dot(h);
 
@@ -367,7 +366,7 @@ fn ggx_distribution(n: Vector3<F>, h: Vector3<F>, roughness: F) -> F {
 	return nominator / denominator;
 }
 
-fn geometry_schlick_ggx(n: Vector3<F>, v: Vector3<F>, r: F) -> F {
+fn geometry_schlick_ggx(n: Vector3, v: Vector3, r: f64) -> f64 {
 	let numerator = n.dot(v).max(0.0);
 	let k = (r * r) / 8.0;
 	let denominator = numerator * (1.0 - k) + k;
@@ -375,25 +374,25 @@ fn geometry_schlick_ggx(n: Vector3<F>, v: Vector3<F>, r: F) -> F {
 	return numerator / denominator;
 }
 
-fn geometry_smith(n: Vector3<F>, v: Vector3<F>, l: Vector3<F>, r: F) -> F {
+fn geometry_smith(n: Vector3, v: Vector3, l: Vector3, r: f64) -> f64 {
 	return geometry_schlick_ggx(n, v, r) * geometry_schlick_ggx(n, l, r);
 }
 
-fn fresnel_schlick(cos_theta: F, F0: Vector3<F>) -> Vector3<F> {
+fn fresnel_schlick(cos_theta: f64, F0: Vector3) -> Vector3 {
 	return F0 + (Vector3::new(1.0, 1.0, 1.0) - F0) * (1.0 - cos_theta).powf(5.0);
 }
 
-fn lerp_vec(min: Vector3<F>, max: Vector3<F>, a: F) -> Vector3<F> {
+fn lerp_vec(min: Vector3, max: Vector3, a: f64) -> Vector3 {
 	Vector3::new(lerp(min.x, max.x, a), lerp(min.y, max.y, a), lerp(min.z, max.z, a))
 }
 
-fn lerp(min: F, max: F, a: F) -> F {
+fn lerp(min: f64, max: f64, a: f64) -> f64 {
 	min + a * (max - min)
 }
 
-fn uniform_sample_hemisphere() -> (Vector3<F>, F) {
-	let r1 = rand::random::<F>();
-	let r2 = rand::random::<F>();
+fn uniform_sample_hemisphere() -> (Vector3, f64) {
+	let r1 = rand::random::<f64>();
+	let r2 = rand::random::<f64>();
 
 	let theta = (r1.sqrt()).acos();
 	let phi = 2.0 * PI * r2;
@@ -403,7 +402,7 @@ fn uniform_sample_hemisphere() -> (Vector3<F>, F) {
 	return (cartesian, pdf);
 }
 
-fn create_coordinate_system_of_n(n: Vector3<F>) -> (Vector3<F>, Vector3<F>) {
+fn create_coordinate_system_of_n(n: Vector3) -> (Vector3, Vector3) {
 	let sign = if n.z > 0.0 { 1.0 } else { -1.0 };
 	let a = -1.0 / (sign + n.z);
 	let b = n.x * n.y * a;

@@ -5,13 +5,13 @@ extern crate raytracer;
 
 use raytracer::{
 	acc_grid,
-	material::Material,
 	mesh::Mesh,
-	primitives::{Sphere,Plane},
 	scene::{Object, Scene},
 	trace::*,
 	transform::Transform,
 };
+
+use core::{prelude::*, primitives::*};
 
 use cgmath::Vector3;
 use std::cell::RefCell;
@@ -119,7 +119,7 @@ fn main() {
 
 	let settings = SettingsBuilder::default()
 		.camera_settings(camera)
-		.sample_count(500)
+		.sample_count(50)
 		.tile_size((32, 32))
 		.bounce_limit(5)
 		.build()
