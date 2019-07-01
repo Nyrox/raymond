@@ -19,8 +19,8 @@ A monte carlo path tracer utilizing cook-torrance physically based rendering.
 
 ## Screenshots
 
-500spp - 5 Bounces Max - Total Time: 375s [4 core i5]
-[<img src="examples/ReflectiveSpheres.png"/>]("examples/ReflectiveSpheres.png")
+500spp - 5 Bounces Max - Total Time: 375s [4 core i5]  
+![Reflective Spheres](examples/ReflectiveSpheres.png)
 
 ## Future Work
 
