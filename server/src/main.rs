@@ -4,14 +4,14 @@ use raytracer::{
 	mesh::Mesh,
 	primitives::Plane,
 	scene::{Object, Scene},
-	trace::{*, Message},
+	trace::{Message, *},
 	transform::Transform,
 };
 
 use cgmath::Vector3;
 
-use std::{path::PathBuf, sync::Arc};
 use log::info;
+use std::{path::PathBuf, sync::Arc};
 
 use std::{
 	fs::File,
@@ -158,9 +158,18 @@ fn main() {
 		.build()
 		.unwrap();
 
-	println!("{}", serde_json::to_string(&protocol::Message::TileProgressed(raytracer::Tile {
-		left: 15, top: 42, width: 12, height: 18, sample_count: 15, data: vec![]
-	})).unwrap());
+	println!(
+		"{}",
+		serde_json::to_string(&protocol::Message::TileProgressed(raytracer::Tile {
+			left: 15,
+			top: 42,
+			width: 12,
+			height: 18,
+			sample_count: 15,
+			data: vec![]
+		}))
+		.unwrap()
+	);
 
 	let listener = TcpListener::bind("127.0.0.1:17025").unwrap();
 	for stream in listener.incoming() {
@@ -174,7 +183,7 @@ fn main() {
 				let mut buf = vec![0; 256];
 				let result = stream.read(&mut buf).unwrap();
 
-					println!("{:?}", buf);
+				println!("{:?}", buf);
 				if result > 0 {
 					info!("Received data: {:?}", buf);
 				}

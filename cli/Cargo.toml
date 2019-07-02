@@ -9,3 +9,4 @@ raytracer={ path="../" }
 image="*"
 cgmath="*"
 simplelog="*"
+core={ path="../core" }

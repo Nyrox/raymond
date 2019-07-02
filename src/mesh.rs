@@ -1,10 +1,10 @@
 use std::{fs, path::PathBuf};
 
-use cgmath::*;
+use super::{F_MAX, PI};
 
-use super::{
-	primitives::{Hit, Ray, SurfaceProperties, Triangle, Vertex, AABB},
-	F, F_MAX, PI,
+use core::{
+	prelude::*,
+	primitives::{Triangle, AABB},
 };
 
 #[derive(Debug)]
@@ -46,7 +46,7 @@ impl Mesh {
 		self.triangles[hit.subobject_index].get_surface_properties(hit)
 	}
 
-	pub fn bake_transform(&mut self, translate: Vector3<F>) {
+	pub fn bake_transform(&mut self, translate: Vector3) {
 		for mut triangle in self.triangles.iter_mut() {
 			triangle.0.position += translate;
 			triangle.1.position += translate;
@@ -81,7 +81,7 @@ impl Mesh {
 		for _ in 0..vertices.capacity() {
 			let mut line = lines.next().unwrap();
 			let mut tokens = line.split_whitespace();
-			let values = tokens.map(|t| t.parse::<F>().unwrap()).collect::<Vec<F>>();
+			let values = tokens.map(|t| t.parse::<f64>().unwrap()).collect::<Vec<f64>>();
 			vertices.push(Vertex {
 				position: Vector3::new(values[0], values[1], values[2]),
 				normal: Vector3::new(values[3], values[4], values[5]),
@@ -122,8 +122,8 @@ impl Mesh {
 	}
 
 	pub fn find_mesh_bounds(tris: &Vec<Triangle>) -> AABB {
-		let mut min = Vector3::<F>::new(125125.0, 1251251.0, 12512512.0);
-		let mut max = Vector3::<F>::new(-123125.0, -125123.0, -512123.0);
+		let mut min = Vector3::new(125125.0, 1251251.0, 12512512.0);
+		let mut max = Vector3::new(-123125.0, -125123.0, -512123.0);
 
 		for tri in tris {
 			for i in 0..3 {

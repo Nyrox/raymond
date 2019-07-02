@@ -1,12 +1,3 @@
-#![feature(nll)]
-
-extern crate cgmath;
-extern crate crossbeam;
-extern crate crossbeam_utils;
-extern crate image;
-extern crate num_cpus;
-extern crate num_traits;
-extern crate rand;
 #[macro_use]
 extern crate serde;
 #[macro_use]
@@ -15,18 +6,17 @@ extern crate serde_derive;
 extern crate derive_builder;
 
 pub mod acc_grid;
-pub mod material;
 pub mod mesh;
-pub mod primitives;
 pub mod scene;
 pub mod trace;
 pub mod transform;
 
-pub type F = f64;
-pub const F_MAX: F = ::std::f64::MAX;
-pub const PI: F = ::std::f64::consts::PI;
+pub const F_MAX: f64 = ::std::f64::MAX;
+pub const PI: f64 = ::std::f64::consts::PI;
 
-pub use cgmath::Vector3;
+extern crate cgmath;
+
+use core::prelude::*;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Tile {
@@ -35,7 +25,7 @@ pub struct Tile {
 	pub height: usize,
 	pub left: usize,
 	pub top: usize,
-	pub data: Vec<cgmath::Vector3<F>>,
+	pub data: Vec<Vector3>,
 }
 
 use std::fmt;
@@ -54,9 +44,7 @@ pub mod prelude {
 	pub use crate::{
 		acc_grid::AccGrid,
 		cgmath::Vector3,
-		material::Material,
 		mesh::Mesh,
-		primitives::Plane,
 		scene::{Model, Object, Scene},
 	};
 }

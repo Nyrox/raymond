@@ -1,20 +1,19 @@
 use std::sync::Arc;
 
-use cgmath::{prelude::*, *};
+use super::{F_MAX, PI};
 
-use super::{F, F_MAX, PI};
+use super::{acc_grid, mesh::Mesh};
 
-use super::{
-	acc_grid,
-	material::Material,
-	mesh::Mesh,
-	primitives::{Hit, Plane, Ray, SurfaceProperties, Triangle, AABB},
+use core::{
+	prelude::*,
+	primitives::{Plane, Sphere, Triangle},
 };
 
 #[derive(Clone)]
 pub enum Object {
 	Plane(Plane),
 	Model(Model),
+	Sphere(Sphere),
 	Grid(Arc<acc_grid::AccGrid>, Material),
 }
 
@@ -23,6 +22,7 @@ impl Object {
 		match self {
 			&Object::Plane(ref p) => &p.material,
 			&Object::Model(ref m) => &m.material,
+			&Object::Sphere(ref s) => &s.material,
 			&Object::Grid(ref g, ref m) => m,
 		}
 	}
@@ -31,6 +31,7 @@ impl Object {
 		match self {
 			&Object::Plane(ref p) => p.intersects(ray),
 			&Object::Model(ref m) => m.intersects(ray),
+			&Object::Sphere(ref s) => s.intersects(ray),
 			&Object::Grid(ref g, _) => g.intersects(ray),
 		}
 	}
@@ -39,6 +40,7 @@ impl Object {
 		match self {
 			&Object::Plane(ref p) => p.get_surface_properties(hit),
 			&Object::Model(ref m) => m.get_surface_properties(hit),
+			&Object::Sphere(ref s) => s.get_surface_properties(hit),
 			&Object::Grid(ref g, _) => g.get_surface_properties(hit),
 		}
 	}
@@ -54,6 +56,7 @@ impl Model {
 	pub fn intersects(&self, ray: Ray) -> Option<Hit> {
 		self.mesh.intersects(ray)
 	}
+
 	pub fn get_surface_properties(&self, hit: Hit) -> SurfaceProperties {
 		self.mesh.get_surface_properties(hit)
 	}
@@ -62,7 +65,7 @@ impl Model {
 #[derive(Clone)]
 pub struct Light {
 	pub mesh: Arc<Mesh>,
-	pub intensity: Vector3<f64>,
+	pub intensity: Vector3,
 }
 
 #[derive(Clone)]
