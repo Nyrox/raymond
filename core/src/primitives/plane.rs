@@ -1,10 +1,10 @@
 use crate::prelude::*;
+use serde::{Deserialize, Serialize};
 
-#[derive(Clone)]
+#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
 pub struct Plane {
 	pub origin: Vector3,
 	pub normal: Vector3,
-	pub material: Material,
 }
 
 impl Intersect for Plane {
@@ -25,14 +25,7 @@ impl Intersect for Plane {
 }
 
 impl Plane {
-	pub fn get_material(&self) -> Material {
-		self.material.clone()
-	}
-
-	pub fn get_surface_properties(&self, hit: Hit) -> SurfaceProperties {
-		SurfaceProperties {
-			normal: self.normal,
-			material: self.material,
-		}
+	pub	fn get_normal_at (&self, _: Hit) -> Vector3 {
+		self.normal
 	}
 }

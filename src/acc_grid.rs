@@ -39,7 +39,8 @@ pub struct AccGrid {
 impl AccGrid {
 	pub fn build_from_mesh(mesh: Mesh) -> AccGrid {
 		let grid_res = estimate_grid_resolution(&mesh.bounding_box, mesh.triangles.len());
-		let cell_size = (mesh.bounding_box.max - mesh.bounding_box.min).div_element_wise(grid_res.cast::<f64>().unwrap());
+		let cell_size = (mesh.bounding_box.max - mesh.bounding_box.min)
+			.div_element_wise(grid_res.cast::<f64>().unwrap());
 		let mut naive_cells = vec![NaiveCell(Vec::new()); grid_res.x * grid_res.y * grid_res.z];
 		let mut mapping_table: Vec<usize> = Vec::new();
 
@@ -62,7 +63,9 @@ impl AccGrid {
 			for z in cell_min.z..=cell_max.z {
 				for y in cell_min.y..=cell_max.y {
 					for x in cell_min.x..=cell_max.x {
-						naive_cells[x + grid_res.x * (y + z * grid_res.z)].0.push(index);
+						naive_cells[x + grid_res.x * (y + z * grid_res.z)]
+							.0
+							.push(index);
 					}
 				}
 			}
@@ -95,15 +98,25 @@ impl AccGrid {
 		let outer_hit_position = ray.origin + ray.direction * outer_hit.distance;
 
 		let mut start = ray.origin - self.mesh.bounding_box.min;
-		let mut current_cell = start.div_element_wise(self.cell_size).cast::<i32>().unwrap();
+		let mut current_cell = start
+			.div_element_wise(self.cell_size)
+			.cast::<i32>()
+			.unwrap();
 
 		if current_cell.x < 0 || current_cell.y < 0 || current_cell.z < 0 {
 			start = outer_hit_position - self.mesh.bounding_box.min;
-			current_cell = start.div_element_wise(self.cell_size).cast::<i32>().unwrap();
+			current_cell = start
+				.div_element_wise(self.cell_size)
+				.cast::<i32>()
+				.unwrap();
 		}
-		let step = Vector3::new(ray.direction.x.signum(), ray.direction.y.signum(), ray.direction.z.signum())
-			.cast::<i32>()
-			.unwrap();
+		let step = Vector3::new(
+			ray.direction.x.signum(),
+			ray.direction.y.signum(),
+			ray.direction.z.signum(),
+		)
+		.cast::<i32>()
+		.unwrap();
 
 		let t_delta_x = if ray.direction.x < 0.0 {
 			-self.cell_size.x
@@ -121,15 +134,22 @@ impl AccGrid {
 			self.cell_size.z
 		} / ray.direction.z;
 
-		let mut t_max_x =
-			(((current_cell.x + if ray.direction.x < 0.0 { 0 } else { 1 }) as f64 * self.cell_size.x) - start.x) / ray.direction.x;
-		let mut t_max_y =
-			(((current_cell.y + if ray.direction.y < 0.0 { 0 } else { 1 }) as f64 * self.cell_size.y) - start.y) / ray.direction.y;
-		let mut t_max_z =
-			(((current_cell.z + if ray.direction.z < 0.0 { 0 } else { 1 }) as f64 * self.cell_size.z) - start.z) / ray.direction.z;
+		let mut t_max_x = (((current_cell.x + if ray.direction.x < 0.0 { 0 } else { 1 }) as f64
+			* self.cell_size.x)
+			- start.x) / ray.direction.x;
+		let mut t_max_y = (((current_cell.y + if ray.direction.y < 0.0 { 0 } else { 1 }) as f64
+			* self.cell_size.y)
+			- start.y) / ray.direction.y;
+		let mut t_max_z = (((current_cell.z + if ray.direction.z < 0.0 { 0 } else { 1 }) as f64
+			* self.cell_size.z)
+			- start.z) / ray.direction.z;
 
 		loop {
-			let (x, y, z) = (current_cell.x as usize, current_cell.y as usize, current_cell.z as usize);
+			let (x, y, z) = (
+				current_cell.x as usize,
+				current_cell.y as usize,
+				current_cell.z as usize,
+			);
 			if x + self.resolution.x * (y + z * self.resolution.z) >= self.cells.len() {
 				return None;
 			}
@@ -145,7 +165,11 @@ impl AccGrid {
 						let distance = h.distance;
 						if distance < closest {
 							closest = distance;
-							closest_hit = Some(Hit::with_child(ray, distance, self.mapping_table[cell.0 + i]));
+							closest_hit = Some(Hit::with_child(
+								ray,
+								distance,
+								self.mapping_table[cell.0 + i],
+							));
 						}
 					}
 					None => (),

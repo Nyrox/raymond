@@ -1,16 +1,13 @@
-extern crate cgmath;
-extern crate image;
-extern crate raytracer;
 
 use raytracer::{
 	acc_grid,
 	mesh::Mesh,
-	scene::{Light, Object, Scene},
+	scene::{Light},
 	trace::*,
 	transform::Transform,
 };
 
-use core::{prelude::*, primitives::*};
+use core::{prelude::*, primitives::*, SceneObject, Scene};
 
 use cgmath::Vector3;
 use std::cell::RefCell;
@@ -19,7 +16,8 @@ use std::{
 	path::PathBuf,
 	sync::{
 		atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT},
-		Arc, RwLock,
+		Arc,
+		RwLock,
 	},
 	time::{Duration, Instant},
 };
@@ -43,68 +41,74 @@ fn main() {
 	let mut scene = Scene::new();
 	let mut sphere_mesh = Mesh::load_ply(PathBuf::from("assets/meshes/ico_sphere.ply"));
 
-	scene.objects.push(Object::Sphere(Sphere {
+	scene.objects.push(SceneObject::Sphere(Sphere {
 		origin: Vector3::new(-1.0, -0.5, 3.5),
 		radius: 0.5,
-		material: Material::Diffuse(Vector3::new(1.0, 0.00, 0.00), 0.02),
-	}));
-	// scene.objects.push(Object::Sphere(Sphere { origin: Vector3::new(0.74, -0.25, 3.5), radius: 0.75, material: Material::Metal(
-	//     Vector3::new(0.05, 0.25, 1.00), 0.01
-	// )}));
+	}, Material::Diffuse(Vector3::new(1.0, 0.00, 0.00), 0.02)));
+	// scene.objects.push(Object::Sphere(Sphere { origin: Vector3::new(0.74,
+	// -0.25, 3.5), radius: 0.75, material: Material::Metal(
+	// Vector3::new(0.05, 0.25, 1.00), 0.01 )}));
 
 	let mut cube_mesh = Mesh::load_ply(PathBuf::from("assets/meshes/dragon_vrip.ply"));
 	cube_mesh.bake_transform(Vector3::new(0.0, -0.3, 2.9));
 	// let mut cube_mesh = Arc::new(cube_mesh);
 	let mut cube_grid = acc_grid::AccGrid::build_from_mesh(cube_mesh);
-	// let hit = cube_grid.intersects(&Ray { origin: Vector3::new(0.0, 0.0, 0.0), direction: Vector3::new(0.0, 0.0, 1.0) });
-	// println!("{:?}", hit);
+	// let hit = cube_grid.intersects(&Ray { origin: Vector3::new(0.0, 0.0,
+	// 0.0), direction: Vector3::new(0.0, 0.0, 1.0) }); println!("{:?}", hit);
 	// panic!();
-	// cube_grid.intersects(&Ray { origin: Vector3::new(0.0, 0.0, 0.0), direction: Vector3::new(0.0, 0.0, 1.0) });
+	// cube_grid.intersects(&Ray { origin: Vector3::new(0.0, 0.0, 0.0),
+	// direction: Vector3::new(0.0, 0.0, 1.0) });
 
-	let cube_grid = Arc::new(cube_grid);
-	let cube_model = Object::Grid(cube_grid, Material::Metal(Vector3::new(1.0, 1.0, 0.1), 0.15));
+	// let cube_grid = Arc::new(cube_grid);
+	// let cube_model = Object::Grid(
+	// 	cube_grid,
+	// 	Material::Metal(Vector3::new(1.0, 1.0, 0.1), 0.15),
+	// );
 
-	scene.objects.push(cube_model);
+	// scene.objects.push(cube_model);
 
 	// // Floor
-	scene.objects.push(Object::Plane(Plane {
+	scene.objects.push(SceneObject::Plane(Plane {
 		origin: Vector3::new(0.0, -1.0, 0.0),
 		normal: Vector3::new(0.0, 1.0, 0.0),
-		material: Material::Diffuse(Vector3::new(0.75, 0.75, 0.75), 0.5),
-	}));
+	}, Material::Diffuse(Vector3::new(0.75, 0.75, 0.75), 0.5)));
 	// Ceiling
-	scene.objects.push(Object::Plane(Plane {
+	scene.objects.push(SceneObject::Plane(Plane {
 		origin: Vector3::new(0.0, 2.0, 0.0),
 		normal: Vector3::new(0.0, -1.0, 0.0),
-		material: Material::Emission(Vector3::new(1.5, 1.5, 1.5), Vector3::new(1.0, 1.0, 1.0), 0.27, 0.0),
-	}));
+	}, Material::Emission(
+			Vector3::new(1.5, 1.5, 1.5),
+			Vector3::new(1.0, 1.0, 1.0),
+			0.27,
+			0.0,
+		)));
 	// Frontwall
-	scene.objects.push(Object::Plane(Plane {
+	scene.objects.push(SceneObject::Plane(Plane {
 		origin: Vector3::new(0.0, 0.0, -2.0),
 		normal: Vector3::new(0.0, 0.0, 1.0),
-		material: Material::Diffuse(Vector3::new(1.0, 1.0, 1.0), 0.4),
-	}));
+	}, Material::Diffuse(Vector3::new(1.0, 1.0, 1.0), 0.4)));
 	// Backwall
-	scene.objects.push(Object::Plane(Plane {
+	scene.objects.push(SceneObject::Plane(Plane {
 		origin: Vector3::new(0.0, 0.0, 5.0),
 		normal: Vector3::new(0.0, 0.0, -1.0),
-		material: Material::Diffuse(Vector3::new(0.0, 0.0, 0.0), 0.9),
-	}));
+		
+	}, Material::Diffuse(Vector3::new(0.0, 0.0, 0.0), 0.9)));
 	// left wall
-	scene.objects.push(Object::Plane(Plane {
+	scene.objects.push(SceneObject::Plane(Plane {
 		origin: Vector3::new(-2.0, 0.0, 0.0),
 		normal: Vector3::new(1.0, 0.0, 0.0),
-		material: Material::Diffuse(Vector3::new(0.0, 0.0, 0.0), 0.3),
-	}));
+		
+	}, Material::Diffuse(Vector3::new(0.0, 0.0, 0.0), 0.3)));
 	// right wall
-	scene.objects.push(Object::Plane(Plane {
+	scene.objects.push(SceneObject::Plane(Plane {
 		origin: Vector3::new(2.0, 0.0, 0.0),
 		normal: Vector3::new(-1.0, 0.0, 0.0),
-		material: Material::Diffuse(Vector3::new(0.0, 0.0, 0.0), 0.3),
-	}));
+	}, Material::Diffuse(Vector3::new(0.0, 0.0, 0.0), 0.3)));
 
-	// scene.lights.push(Light { position: Vector3::new(0.0, 1.95, 2.5), intensity: Vector3::new(0.8, 0.8, 1.0) });
-	// scene.lights.push(Light { position: Vector3::new(1.75, -0.75, 1.0), intensity: Vector3::new(0.8, 1.0, 0.7) });
+	// scene.lights.push(Light { position: Vector3::new(0.0, 1.95, 2.5),
+	// intensity: Vector3::new(0.8, 0.8, 1.0) }); scene.lights.push(Light {
+	// position: Vector3::new(1.75, -0.75, 1.0), intensity: Vector3::new(0.8,
+	// 1.0, 0.7) });
 	let HEIGHT = 340;
 	let WIDTH = HEIGHT / 9 * 16;
 
@@ -120,7 +124,7 @@ fn main() {
 
 	let settings = SettingsBuilder::default()
 		.camera_settings(camera)
-		.sample_count(500)
+		.sample_count(20)
 		.tile_size((32, 32))
 		.bounce_limit(5)
 		.build()
@@ -139,7 +143,8 @@ fn main() {
 	for (i, p) in final_image.iter().enumerate() {
 		let exposure = 1.0;
 		let gamma = 2.2;
-		let tone_mapped = Vector3::new(1.0, 1.0, 1.0) - element_wise_map(&(p * -1.0 * exposure), |e| f64::exp(e));
+		let tone_mapped =
+			Vector3::new(1.0, 1.0, 1.0) - element_wise_map(&(p * -1.0 * exposure), |e| f64::exp(e));
 		let tone_mapped = element_wise_map(&tone_mapped, |x| x.powf(1.0 / gamma));
 
 		for i in 0..3 {
@@ -168,8 +173,11 @@ fn main() {
 		SHADOW_TOTAL_TIME.load(Ordering::Relaxed) as f32 / 1000.0 / 1000.0 / 1000.0
 	);
 
-	let image: image::ImageBuffer<image::Rgb<u8>, Vec<u8>> = image::ImageBuffer::from_fn(WIDTH as u32, HEIGHT as u32, |x, y| {
-		image::Rgb(export[(x + y * WIDTH as u32) as usize].into())
-	});
-	image.save("output.png").expect("Failed to save buffer to disk");
+	let image: image::ImageBuffer<image::Rgb<u8>, Vec<u8>> =
+		image::ImageBuffer::from_fn(WIDTH as u32, HEIGHT as u32, |x, y| {
+			image::Rgb(export[(x + y * WIDTH as u32) as usize].into())
+		});
+	image
+		.save("output.png")
+		.expect("Failed to save buffer to disk");
 }

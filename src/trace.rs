@@ -1,10 +1,12 @@
 use std::{
 	default::Default,
-	f64, marker,
+	f64,
+	marker,
 	sync::{
 		atomic::{AtomicUsize, Ordering},
 		mpsc::{self, Receiver, Sender, TryRecvError},
-		Arc, RwLock,
+		Arc,
+		RwLock,
 	},
 	thread,
 	time::Duration,
@@ -41,7 +43,8 @@ pub struct Settings {
 	pub camera_settings: CameraSettings,
 	pub sample_count: usize,
 	// The amount of samples per iteration
-	// If set to 0, the renderer will only notify the Receiver when a tile is fully rendered
+	// If set to 0, the renderer will only notify the Receiver when a tile is
+	// fully rendered
 	#[builder(default = "0")]
 	pub samples_per_iteration: usize,
 	pub tile_size: (usize, usize),
@@ -76,7 +79,8 @@ impl TaskHandle {
 	pub fn r#await(&self) -> Vec<Vector3> {
 		let mut out = vec![
 			Vector3::new(0.0, 0.0, 0.0);
-			self.settings.camera_settings.backbuffer_width * self.settings.camera_settings.backbuffer_height
+			self.settings.camera_settings.backbuffer_width
+				* self.settings.camera_settings.backbuffer_height
 		];
 
 		'poll: loop {
@@ -86,9 +90,12 @@ impl TaskHandle {
 						Ok(Message::TileFinished(tile)) => {
 							for y in 0..tile.height {
 								for x in 0..tile.width {
-									let s = tile.data[x + y * tile.width] / tile.sample_count as f64;
+									let s =
+										tile.data[x + y * tile.width] / tile.sample_count as f64;
 
-									out[x + tile.left + (y + tile.top) * self.settings.camera_settings.backbuffer_width] = s;
+									out[x
+										+ tile.left + (y + tile.top)
+										* self.settings.camera_settings.backbuffer_width] = s;
 								}
 							}
 						}
@@ -189,7 +196,8 @@ pub fn render_tiled(scene: Scene, settings: Settings) -> TaskHandle {
 					let primary = generate_primary_ray(x, y, &context.settings.camera_settings);
 					let sample = trace(primary, &context, 1);
 
-					// Map the global pixel indices to the local tile buffer and store the sample
+					// Map the global pixel indices to the local tile buffer and
+					// store the sample
 					tile.data[(x - tile.left) + (y - tile.top) * tile.width] += sample;
 				}
 			}
@@ -204,7 +212,9 @@ pub fn render_tiled(scene: Scene, settings: Settings) -> TaskHandle {
 				queue.push(tile.clone());
 
 				// Check if we want to send our tile down the pipe
-				if context.settings.samples_per_iteration != 0 && tile.sample_count % context.settings.samples_per_iteration == 0 {
+				if context.settings.samples_per_iteration != 0
+					&& tile.sample_count % context.settings.samples_per_iteration == 0
+				{
 					sender.send(Message::TileProgressed(tile.clone())).unwrap();
 				}
 			}
@@ -234,24 +244,25 @@ fn trace(ray: Ray, context: &TraceContext, depth: usize) -> Vector3 {
 	let surface_properties = object.get_surface_properties(hit);
 	let normal = surface_properties.normal;
 	let fragment_position = ray.origin + ray.direction * hit.distance;
-	let (material_color, material_roughness, material_metalness) = match object.get_material() {
-		Material::Diffuse(color, roughness) => (color, *roughness, 0.0),
-		Material::Metal(color, roughness) => (color, *roughness, 1.0),
+	let (material_color, material_roughness, material_metalness) = match surface_properties.material {
+		Material::Diffuse(color, roughness) => (color, roughness, 0.0),
+		Material::Metal(color, roughness) => (color, roughness, 1.0),
 		Material::Emission(e, _, _, _) => {
-			return *e;
+			return e;
 		}
 		_ => panic!(),
 	};
 
-	for light in context.scene.lights.iter() {}
+	// for light in context.scene.lights.iter() {}
 
 	let view_dir = (settings.camera_settings.transform.position - fragment_position).normalize();
 	let f0 = Vector3::new(0.04, 0.04, 0.04);
-	let f0 = lerp_vec(f0, *material_color, material_metalness);
+	let f0 = lerp_vec(f0, material_color, material_metalness);
 	// Decide whether to sample diffuse or specular
 	let r = rand::random::<f64>();
 	let local_cartesian = create_coordinate_system_of_n(normal);
-	let local_cartesian_transform = cgmath::Matrix3::from_cols(local_cartesian.0, normal, local_cartesian.1);
+	let local_cartesian_transform =
+		cgmath::Matrix3::from_cols(local_cartesian.0, normal, local_cartesian.1);
 	let prob_d = lerp(0.5, 0.0, material_metalness);
 	if r < prob_d {
 		let (sample, pdf) = uniform_sample_hemisphere();
@@ -270,7 +281,8 @@ fn trace(ray: Ray, context: &TraceContext, depth: usize) -> Vector3 {
 		let specular_part = fresnel;
 		let mut diffuse_part = Vector3::new(1.0, 1.0, 1.0) - specular_part;
 		diffuse_part *= 1.0 - material_metalness;
-		let output = (diffuse_part.mul_element_wise(*material_color)).mul_element_wise(radiance) * cos_theta;
+		let output =
+			(diffuse_part.mul_element_wise(material_color)).mul_element_wise(radiance) * cos_theta;
 		return output / (prob_d * pdf);
 	} else {
 		// Sample specular
@@ -281,7 +293,11 @@ fn trace(ray: Ray, context: &TraceContext, depth: usize) -> Vector3 {
 			let a = roughness * roughness;
 			let phi = 2.0 * PI * r1;
 			let theta = a * (r2 / (1.0 - r2)).sqrt();
-			let h = Vector3::new(theta.sin() * phi.cos(), theta.cos(), theta.sin() * phi.sin());
+			let h = Vector3::new(
+				theta.sin() * phi.cos(),
+				theta.cos(),
+				theta.sin() * phi.sin(),
+			);
 			let (tangent, bitangent) = create_coordinate_system_of_n(reflect);
 			let matrix = cgmath::Matrix3::from_cols(tangent, reflect, bitangent);
 			return (matrix * h).normalize();
@@ -318,10 +334,14 @@ fn generate_primary_ray(x: usize, y: usize, camera: &CameraSettings) -> Ray {
 	let x = x as f64 + (rand::random::<f64>() - 0.5);
 	let y = y as f64 + (rand::random::<f64>() - 0.5);
 
-	let px = (2.0 * ((x + 0.5) / width) - 1.0) * f64::tan(camera.fov_vert / 2.0 * PI / 180.0) * aspect;
+	let px =
+		(2.0 * ((x + 0.5) / width) - 1.0) * f64::tan(camera.fov_vert / 2.0 * PI / 180.0) * aspect;
 	let py = (1.0 - 2.0 * ((y + 0.5) / height)) * f64::tan(camera.fov_vert / 2.0 * PI / 180.0);
 
-	Ray::new(camera.transform.position, Vector3::new(px, py, 1.0).normalize())
+	Ray::new(
+		camera.transform.position,
+		Vector3::new(px, py, 1.0).normalize(),
+	)
 }
 
 fn generate_primary_ray_with_dof(x: usize, y: usize, camera: &CameraSettings) -> Ray {
@@ -341,10 +361,10 @@ fn generate_primary_ray_with_dof(x: usize, y: usize, camera: &CameraSettings) ->
 
 	let focal_plane = Plane {
 		origin: camera.transform.position + Vector3::new(0.0, 0.0, 1.0) * camera.focal_length,
-		normal: Vector3::new(0.0, 0.0, -1.0),
-		material: Material::Diffuse(Vector3::new(0.75, 0.75, 0.75), 0.5),
+		normal: Vector3::new(0.0, 0.0, -1.0)
 	};
-	let end = camera.transform.position + focal_plane.intersects(primary).unwrap().distance * primary.direction;
+	let end = camera.transform.position
+		+ focal_plane.intersects(primary).unwrap().distance * primary.direction;
 
 	return Ray {
 		origin: start,
@@ -379,7 +399,11 @@ fn fresnel_schlick(cos_theta: f64, F0: Vector3) -> Vector3 {
 }
 
 fn lerp_vec(min: Vector3, max: Vector3, a: f64) -> Vector3 {
-	Vector3::new(lerp(min.x, max.x, a), lerp(min.y, max.y, a), lerp(min.z, max.z, a))
+	Vector3::new(
+		lerp(min.x, max.x, a),
+		lerp(min.y, max.y, a),
+		lerp(min.z, max.z, a),
+	)
 }
 
 fn lerp(min: f64, max: f64, a: f64) -> f64 {
@@ -394,7 +418,11 @@ fn uniform_sample_hemisphere() -> (Vector3, f64) {
 	let phi = 2.0 * PI * r2;
 
 	let pdf = r1.sqrt();
-	let cartesian = Vector3::new(theta.sin() * phi.cos(), theta.cos(), theta.sin() * phi.sin());
+	let cartesian = Vector3::new(
+		theta.sin() * phi.cos(),
+		theta.cos(),
+		theta.sin() * phi.sin(),
+	);
 	return (cartesian, pdf);
 }
 

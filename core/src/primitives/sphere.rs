@@ -1,10 +1,10 @@
 use crate::prelude::*;
+use serde::{Deserialize, Serialize};
 
-#[derive(Clone)]
+#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
 pub struct Sphere {
 	pub origin: Vector3,
 	pub radius: f64,
-	pub material: Material,
 }
 
 impl Intersect for Sphere {
@@ -28,14 +28,7 @@ impl Intersect for Sphere {
 }
 
 impl Sphere {
-	pub fn get_material(&self) -> Material {
-		self.material.clone()
-	}
-
-	pub fn get_surface_properties(&self, hit: Hit) -> SurfaceProperties {
-		SurfaceProperties {
-			normal: ((hit.ray.origin + hit.ray.direction * hit.distance) - self.origin).normalize(),
-			material: self.material,
-		}
+	pub fn get_normal_at (&self, hit: Hit) -> Vector3 {
+		((hit.ray.origin + hit.ray.direction * hit.distance) - self.origin).normalize()
 	}
 }

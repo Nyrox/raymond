@@ -3,8 +3,6 @@ use serde::{Deserialize, Serialize};
 use raytracer::Tile;
 
 ///
-///
-///
 
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type", content = "data")]

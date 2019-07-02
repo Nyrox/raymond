@@ -45,6 +45,8 @@ pub mod prelude {
 		acc_grid::AccGrid,
 		cgmath::Vector3,
 		mesh::Mesh,
-		scene::{Model, Object, Scene},
+		scene::{Model, Scene},
 	};
+
+	pub use core::SceneObject;
 }

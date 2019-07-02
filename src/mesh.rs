@@ -69,7 +69,9 @@ impl Mesh {
 
 			match tokens.next().unwrap() {
 				"element" => match tokens.next().unwrap() {
-					"vertex" => vertices.reserve_exact(tokens.next().unwrap().parse::<usize>().unwrap()),
+					"vertex" => {
+						vertices.reserve_exact(tokens.next().unwrap().parse::<usize>().unwrap())
+					}
 					_ => {}
 				},
 				"end_header" => break 'header,
@@ -81,11 +83,16 @@ impl Mesh {
 		for _ in 0..vertices.capacity() {
 			let mut line = lines.next().unwrap();
 			let mut tokens = line.split_whitespace();
-			let values = tokens.map(|t| t.parse::<f64>().unwrap()).collect::<Vec<f64>>();
+			let values = tokens
+				.map(|t| t.parse::<f64>().unwrap())
+				.collect::<Vec<f64>>();
 			vertices.push(Vertex {
 				position: Vector3::new(values[0], values[1], values[2]),
 				normal: Vector3::new(values[3], values[4], values[5]),
-				uv: Vector2::new(*values.get(6).unwrap_or(&0.0), *values.get(7).unwrap_or(&0.0)),
+				uv: Vector2::new(
+					*values.get(6).unwrap_or(&0.0),
+					*values.get(7).unwrap_or(&0.0),
+				),
 				tangent: Vector3::new(0.0, 0.0, 0.0),
 			});
 		}
@@ -93,7 +100,9 @@ impl Mesh {
 		// Parse faces
 		'faces: while let Some(line) = lines.next() {
 			let mut tokens = line.split_whitespace();
-			let values = tokens.map(|t| t.parse::<u32>().unwrap()).collect::<Vec<u32>>();
+			let values = tokens
+				.map(|t| t.parse::<u32>().unwrap())
+				.collect::<Vec<u32>>();
 
 			match values[0] {
 				3 => {
