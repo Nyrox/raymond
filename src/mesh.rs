@@ -1,13 +1,11 @@
 use std::{fs, path::PathBuf};
 
+use super::{F_MAX, PI};
 
-use super::{
-	F_MAX, PI,
+use core::{
+	prelude::*,
+	primitives::{Triangle, AABB},
 };
-
-use core::prelude::*;
-use core::primitives::{Triangle, AABB};
-
 
 #[derive(Debug)]
 pub struct Mesh {

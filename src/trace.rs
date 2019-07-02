@@ -10,20 +10,16 @@ use std::{
 	time::Duration,
 };
 
-use crossbeam::{queue::MsQueue};
+use crossbeam::queue::MsQueue;
 use rand;
 
 use num_cpus;
 
-use super::{
-	scene::*,
-	transform::Transform,
-};
+use super::{scene::*, transform::Transform};
 
-use core::prelude::*;
-use core::primitives::Plane;
+use core::{prelude::*, primitives::Plane};
 
-use super::{PI};
+use super::PI;
 
 use log::*;
 

@@ -1,5 +1,4 @@
-use crate::prelude::*;
-use crate::primitives::AABB;
+use crate::{prelude::*, primitives::AABB};
 
 #[derive(Debug)]
 pub struct Triangle(pub Vertex, pub Vertex, pub Vertex);
@@ -39,8 +38,6 @@ impl Intersect for Triangle {
 
 		return None;
 	}
-
-
 }
 impl Triangle {
 	pub fn get_surface_properties(&self, hit: Hit) -> SurfaceProperties {
@@ -63,7 +60,7 @@ impl Triangle {
 
 		return SurfaceProperties {
 			normal: normal.normalize(),
-			material: Material::Diffuse(Vector3::new(0.0, 0.0, 0.0), 0.5)
+			material: Material::Diffuse(Vector3::new(0.0, 0.0, 0.0), 0.5),
 		};
 	}
 

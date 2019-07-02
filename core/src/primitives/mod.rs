@@ -1,12 +1,6 @@
-
-mod triangle;
-mod sphere;
-mod plane;
 mod aabb;
+mod plane;
+mod sphere;
+mod triangle;
 
-pub use self::{
-	triangle::Triangle,
-	sphere::Sphere,
-	plane::Plane,
-	aabb::AABB,
-};
+pub use self::{aabb::AABB, plane::Plane, sphere::Sphere, triangle::Triangle};

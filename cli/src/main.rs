@@ -1,4 +1,3 @@
-
 extern crate cgmath;
 extern crate image;
 extern crate raytracer;
@@ -6,7 +5,7 @@ extern crate raytracer;
 use raytracer::{
 	acc_grid,
 	mesh::Mesh,
-	scene::{Object, Scene},
+	scene::{Light, Object, Scene},
 	trace::*,
 	transform::Transform,
 };
@@ -44,12 +43,14 @@ fn main() {
 	let mut scene = Scene::new();
 	let mut sphere_mesh = Mesh::load_ply(PathBuf::from("assets/meshes/ico_sphere.ply"));
 
-	scene.objects.push(Object::Sphere(Sphere { origin: Vector3::new(-1.0, -0.5, 3.5), radius: 0.5, material: Material::Diffuse(
-	    Vector3::new(1.0, 0.00, 0.00), 0.02
-	)}));
-	scene.objects.push(Object::Sphere(Sphere { origin: Vector3::new(0.74, -0.25, 3.5), radius: 0.75, material: Material::Metal(
-	    Vector3::new(0.05, 0.25, 1.00), 0.01
-	)}));
+	scene.objects.push(Object::Sphere(Sphere {
+		origin: Vector3::new(-1.0, -0.5, 3.5),
+		radius: 0.5,
+		material: Material::Diffuse(Vector3::new(1.0, 0.00, 0.00), 0.02),
+	}));
+	// scene.objects.push(Object::Sphere(Sphere { origin: Vector3::new(0.74, -0.25, 3.5), radius: 0.75, material: Material::Metal(
+	//     Vector3::new(0.05, 0.25, 1.00), 0.01
+	// )}));
 
 	let mut cube_mesh = Mesh::load_ply(PathBuf::from("assets/meshes/dragon_vrip.ply"));
 	cube_mesh.bake_transform(Vector3::new(0.0, -0.3, 2.9));
@@ -60,10 +61,10 @@ fn main() {
 	// panic!();
 	// cube_grid.intersects(&Ray { origin: Vector3::new(0.0, 0.0, 0.0), direction: Vector3::new(0.0, 0.0, 1.0) });
 
-	// let cube_grid = Arc::new(cube_grid);
-	// let cube_model = Object::Grid(cube_grid, Material::Metal(Vector3::new(1.0, 1.0, 0.1), 0.15));
+	let cube_grid = Arc::new(cube_grid);
+	let cube_model = Object::Grid(cube_grid, Material::Metal(Vector3::new(1.0, 1.0, 0.1), 0.15));
 
-	// scene.objects.push(cube_model);
+	scene.objects.push(cube_model);
 
 	// // Floor
 	scene.objects.push(Object::Plane(Plane {
@@ -119,7 +120,7 @@ fn main() {
 
 	let settings = SettingsBuilder::default()
 		.camera_settings(camera)
-		.sample_count(50)
+		.sample_count(500)
 		.tile_size((32, 32))
 		.bounce_limit(5)
 		.build()

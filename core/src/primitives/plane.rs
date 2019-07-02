@@ -8,8 +8,6 @@ pub struct Plane {
 }
 
 impl Intersect for Plane {
-
-
 	fn intersects(&self, ray: Ray) -> Option<Hit> {
 		let normal = self.normal;
 
@@ -24,16 +22,17 @@ impl Intersect for Plane {
 
 		return None;
 	}
-
-
 }
 
 impl Plane {
-		pub fn get_material(&self) -> Material {
+	pub fn get_material(&self) -> Material {
 		self.material.clone()
 	}
 
-		pub fn get_surface_properties(&self, hit: Hit) -> SurfaceProperties {
-		SurfaceProperties { normal: self.normal, material: self.material }
+	pub fn get_surface_properties(&self, hit: Hit) -> SurfaceProperties {
+		SurfaceProperties {
+			normal: self.normal,
+			material: self.material,
+		}
 	}
 }

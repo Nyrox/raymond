@@ -1,4 +1,3 @@
-
 /* Core Type Definitions */
 
 pub type Vector3 = cgmath::Vector3<f64>;
@@ -6,28 +5,12 @@ pub type Vector2 = cgmath::Vector2<f64>;
 
 pub mod primitives;
 
-
-
 pub mod prelude {
-	pub use super::{
-		Vector2,
-		Vector3,
-		Material,
-		SurfaceProperties,
-		Hit,
-		Ray,
-		Vertex,
-		Intersect,
-		Traceable,
-	};
+	pub use super::{Hit, Intersect, Material, Ray, SurfaceProperties, Traceable, Vector2, Vector3, Vertex};
 
 	// We need to ex-export some of cgmath's traits to make certain operations
 	// usable without having to leak cgmath
-	pub use cgmath::{
-		InnerSpace,
-		MetricSpace,
-		ElementWise,
-	};
+	pub use cgmath::{ElementWise, InnerSpace, MetricSpace};
 }
 
 use prelude::*;
@@ -39,12 +22,10 @@ pub enum Material {
 	Emission(Vector3, Vector3, f64, f64),
 }
 
-
-
 #[derive(Clone, Debug)]
 pub struct SurfaceProperties {
 	pub normal: Vector3,
-	pub material: Material
+	pub material: Material,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -72,7 +53,6 @@ impl Hit {
 	}
 }
 
-
 #[derive(Clone, Copy, Debug)]
 pub struct Ray {
 	pub origin: Vector3,
@@ -86,11 +66,11 @@ impl Ray {
 }
 
 pub trait Intersect {
-	fn intersects (&self, ray: Ray) -> Option<Hit>;
+	fn intersects(&self, ray: Ray) -> Option<Hit>;
 }
 
 pub trait Traceable: Intersect {
-	fn get_surface_properties (&self, hit: Hit) -> SurfaceProperties;
+	fn get_surface_properties(&self, hit: Hit) -> SurfaceProperties;
 }
 
 #[derive(Clone, Debug)]

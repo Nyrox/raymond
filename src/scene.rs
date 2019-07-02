@@ -2,13 +2,12 @@ use std::sync::Arc;
 
 use super::{F_MAX, PI};
 
-use super::{
-	acc_grid,
-	mesh::Mesh,
-};
+use super::{acc_grid, mesh::Mesh};
 
-use core::prelude::*;
-use core::primitives::{Plane, Sphere, Triangle};
+use core::{
+	prelude::*,
+	primitives::{Plane, Sphere, Triangle},
+};
 
 #[derive(Clone)]
 pub enum Object {
@@ -57,6 +56,7 @@ impl Model {
 	pub fn intersects(&self, ray: Ray) -> Option<Hit> {
 		self.mesh.intersects(ray)
 	}
+
 	pub fn get_surface_properties(&self, hit: Hit) -> SurfaceProperties {
 		self.mesh.get_surface_properties(hit)
 	}

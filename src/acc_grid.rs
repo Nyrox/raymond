@@ -1,10 +1,9 @@
+use super::mesh::Mesh;
 
-use super::{
-	mesh::Mesh,
+use core::{
+	prelude::*,
+	primitives::{Triangle, AABB},
 };
-
-use core::prelude::*;
-use core::primitives::{Triangle, AABB};
 
 const GRID_DENSITY_BIAS: f64 = 3.0;
 
