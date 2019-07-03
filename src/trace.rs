@@ -361,7 +361,8 @@ fn generate_primary_ray_with_dof(x: usize, y: usize, camera: &CameraSettings) ->
 
 	let focal_plane = Plane {
 		origin: camera.transform.position + Vector3::new(0.0, 0.0, 1.0) * camera.focal_length,
-		normal: Vector3::new(0.0, 0.0, -1.0)
+		normal: Vector3::new(0.0, 0.0, -1.0),
+		radius: None,
 	};
 	let end = camera.transform.position
 		+ focal_plane.intersects(primary).unwrap().distance * primary.direction;

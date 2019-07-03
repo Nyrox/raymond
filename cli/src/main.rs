@@ -126,9 +126,9 @@ fn main() {
 
 	let settings = SettingsBuilder::default()
 		.camera_settings(camera)
-		.sample_count(200)
+		.sample_count(50)
 		.tile_size((16, 16))
-		.bounce_limit(6)
+		.bounce_limit(5)
 		.build()
 		.unwrap();
 
