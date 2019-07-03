@@ -17,14 +17,14 @@ fn scene_load_and_store() {
 		env!("CARGO_MANIFEST_DIR")
 	);
 
-	let scene = Scene::load(&Path::new(&input_path)).expect("failed to load scene");
+	let scene = Scene::load(&input_path).expect("failed to load scene");
 	scene
-		.store(&Path::new(&output_path))
+		.store(&output_path)
 		.expect("failed to save scene");
 
-	let new_scene = Scene::load(&Path::new(&output_path)).expect("failed to load scene");
+	let new_scene = Scene::load(&output_path).expect("failed to load scene");
 
 	assert_eq!(scene, new_scene);
 
-	fs::remove_file(&Path::new(&output_path)).expect("failed to remove file");
+	fs::remove_file(&output_path).expect("failed to remove file");
 }

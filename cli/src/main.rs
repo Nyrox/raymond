@@ -41,10 +41,12 @@ fn main() {
 	let mut scene = Scene::new();
 	let mut sphere_mesh = Mesh::load_ply(PathBuf::from("assets/meshes/ico_sphere.ply"));
 
-	scene.objects.push(SceneObject::Sphere(Sphere {
-		origin: Vector3::new(-1.0, -0.5, 3.5),
-		radius: 0.5,
-	}, Material::Diffuse(Vector3::new(1.0, 0.00, 0.00), 0.02)));
+	let mut scene = Scene::load ("./core/tests/resources/basic_scene/scene.ron").expect("failed to load scene");
+
+	// scene.objects.push(SceneObject::Sphere(Sphere {
+	// 	origin: Vector3::new(-1.0, -0.5, 3.5),
+	// 	radius: 0.5,
+	// }, Material::Diffuse(Vector3::new(1.0, 0.00, 0.00), 0.02)));
 	// scene.objects.push(Object::Sphere(Sphere { origin: Vector3::new(0.74,
 	// -0.25, 3.5), radius: 0.75, material: Material::Metal(
 	// Vector3::new(0.05, 0.25, 1.00), 0.01 )}));
@@ -68,42 +70,42 @@ fn main() {
 	// scene.objects.push(cube_model);
 
 	// // Floor
-	scene.objects.push(SceneObject::Plane(Plane {
-		origin: Vector3::new(0.0, -1.0, 0.0),
-		normal: Vector3::new(0.0, 1.0, 0.0),
-	}, Material::Diffuse(Vector3::new(0.75, 0.75, 0.75), 0.5)));
-	// Ceiling
-	scene.objects.push(SceneObject::Plane(Plane {
-		origin: Vector3::new(0.0, 2.0, 0.0),
-		normal: Vector3::new(0.0, -1.0, 0.0),
-	}, Material::Emission(
-			Vector3::new(1.5, 1.5, 1.5),
-			Vector3::new(1.0, 1.0, 1.0),
-			0.27,
-			0.0,
-		)));
-	// Frontwall
-	scene.objects.push(SceneObject::Plane(Plane {
-		origin: Vector3::new(0.0, 0.0, -2.0),
-		normal: Vector3::new(0.0, 0.0, 1.0),
-	}, Material::Diffuse(Vector3::new(1.0, 1.0, 1.0), 0.4)));
-	// Backwall
-	scene.objects.push(SceneObject::Plane(Plane {
-		origin: Vector3::new(0.0, 0.0, 5.0),
-		normal: Vector3::new(0.0, 0.0, -1.0),
+	// scene.objects.push(SceneObject::Plane(Plane {
+	// 	origin: Vector3::new(0.0, -1.0, 0.0),
+	// 	normal: Vector3::new(0.0, 1.0, 0.0),
+	// }, Material::Diffuse(Vector3::new(0.75, 0.75, 0.75), 0.5)));
+	// // Ceiling
+	// scene.objects.push(SceneObject::Plane(Plane {
+	// 	origin: Vector3::new(0.0, 2.0, 0.0),
+	// 	normal: Vector3::new(0.0, -1.0, 0.0),
+	// }, Material::Emission(
+	// 		Vector3::new(1.5, 1.5, 1.5),
+	// 		Vector3::new(1.0, 1.0, 1.0),
+	// 		0.27,
+	// 		0.0,
+	// 	)));
+	// // Frontwall
+	// scene.objects.push(SceneObject::Plane(Plane {
+	// 	origin: Vector3::new(0.0, 0.0, -2.0),
+	// 	normal: Vector3::new(0.0, 0.0, 1.0),
+	// }, Material::Diffuse(Vector3::new(1.0, 1.0, 1.0), 0.4)));
+	// // Backwall
+	// scene.objects.push(SceneObject::Plane(Plane {
+	// 	origin: Vector3::new(0.0, 0.0, 5.0),
+	// 	normal: Vector3::new(0.0, 0.0, -1.0),
 		
-	}, Material::Diffuse(Vector3::new(0.0, 0.0, 0.0), 0.9)));
-	// left wall
-	scene.objects.push(SceneObject::Plane(Plane {
-		origin: Vector3::new(-2.0, 0.0, 0.0),
-		normal: Vector3::new(1.0, 0.0, 0.0),
+	// }, Material::Diffuse(Vector3::new(0.0, 0.0, 0.0), 0.9)));
+	// // left wall
+	// scene.objects.push(SceneObject::Plane(Plane {
+	// 	origin: Vector3::new(-2.0, 0.0, 0.0),
+	// 	normal: Vector3::new(1.0, 0.0, 0.0),
 		
-	}, Material::Diffuse(Vector3::new(0.0, 0.0, 0.0), 0.3)));
-	// right wall
-	scene.objects.push(SceneObject::Plane(Plane {
-		origin: Vector3::new(2.0, 0.0, 0.0),
-		normal: Vector3::new(-1.0, 0.0, 0.0),
-	}, Material::Diffuse(Vector3::new(0.0, 0.0, 0.0), 0.3)));
+	// }, Material::Diffuse(Vector3::new(0.0, 0.0, 0.0), 0.3)));
+	// // right wall
+	// scene.objects.push(SceneObject::Plane(Plane {
+	// 	origin: Vector3::new(2.0, 0.0, 0.0),
+	// 	normal: Vector3::new(-1.0, 0.0, 0.0),
+	// }, Material::Diffuse(Vector3::new(0.0, 0.0, 0.0), 0.3)));
 
 	// scene.lights.push(Light { position: Vector3::new(0.0, 1.95, 2.5),
 	// intensity: Vector3::new(0.8, 0.8, 1.0) }); scene.lights.push(Light {
@@ -124,9 +126,9 @@ fn main() {
 
 	let settings = SettingsBuilder::default()
 		.camera_settings(camera)
-		.sample_count(20)
-		.tile_size((32, 32))
-		.bounce_limit(5)
+		.sample_count(200)
+		.tile_size((16, 16))
+		.bounce_limit(6)
 		.build()
 		.unwrap();
 

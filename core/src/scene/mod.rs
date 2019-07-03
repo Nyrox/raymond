@@ -45,13 +45,13 @@ impl Scene {
 		}
 	}
 
-	pub fn load(path: &Path) -> Result<Scene, Box<Error>> {
-		let f = File::open(path)?;
+	pub fn load<P: AsRef<Path>> (path: P) -> Result<Scene, Box<Error>> {
+		let f = File::open(path.as_ref())?;
 		Ok(ron::de::from_reader(f)?)
 	}
 
-	pub fn store(&self, path: &Path) -> Result<(), Box<Error>> {
-		let mut f = File::create(path)?;
+	pub fn store<P: AsRef<Path>> (&self, path: P) -> Result<(), Box<Error>> {
+		let mut f = File::create(path.as_ref())?;
 		let s = ron::ser::to_string_pretty(self, Default::default())?;
 		f.write(s.as_bytes())?;
 

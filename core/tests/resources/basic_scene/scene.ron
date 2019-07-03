@@ -1,5 +1,6 @@
 (
     objects: [
+		// Ground
         Plane((
             origin: (
                 x: 0,
@@ -16,5 +17,100 @@
             y: 1,
             z: 0.1,
         ), 0.15)),
+
+	    // Left
+        Plane((
+            origin: (
+                x: 2,
+                y: 0,
+                z: 0,
+            ),
+            normal: (
+                x: -1,
+                y: 0,
+                z: 0,
+            ),
+        ), Metal((
+            x: 0.1,
+            y: 1,
+            z: 1.0,
+        ), 0.15)),
+
+		// Right
+        Plane((
+            origin: (
+                x: -2,
+                y: 0,
+                z: 0,
+            ),
+            normal: (
+                x: 1,
+                y: 0,
+                z: 0,
+            ),
+        ), Metal((
+            x: 1,
+            y: 0.1,
+            z: 1,
+        ), 0.15)),
+
+		// BAckwall
+		Plane((
+            origin: (
+                x: 0,
+                y: 0,
+                z: 5.09,
+            ),
+            normal: (
+                x: 0,
+                y: 0,
+                z: -1,
+            ),
+        ), Metal((
+            x: 0.1,
+            y: 0.1,
+            z: 0.1,
+        ), 0.77)),
+
+		// Frontwall
+		Plane((
+            origin: (
+                x: 0,
+                y: 0,
+                z: -2.0,
+            ),
+            normal: (
+                x: 0,
+                y: 0,
+                z: 1,
+            ),
+        ), Diffuse((
+            x: 0.1,
+            y: 0.1,
+            z: 0.1,
+        ), 0.77)),
+
+		// Ceiling
+		Plane((
+			origin: (
+				x: 0.0,
+				y: 2.0,
+				z: 0.0,
+			),
+			normal: (
+				x: 0.0,
+				y: -1.0,
+				z: 0.0,
+			),
+		), Emission((
+			x: 1.5, y: 1.5, z: 1.5
+		), (x: 1.0, y: 1.0, z: 1.0), 0.27, 0.0)),
+
+		Sphere((
+			origin: (x: -1.0, y: -0.5, z: 3.5),
+			radius: 0.5
+		), Diffuse(
+			(x: 1.0, y: 0.0, z: 0.0), 0.02
+		)),
     ],
 )
