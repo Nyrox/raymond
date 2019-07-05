@@ -18,9 +18,7 @@ fn scene_load_and_store() {
 	);
 
 	let scene = Scene::load(&input_path).expect("failed to load scene");
-	scene
-		.store(&output_path)
-		.expect("failed to save scene");
+	scene.store(&output_path).expect("failed to save scene");
 
 	let new_scene = Scene::load(&output_path).expect("failed to load scene");
 

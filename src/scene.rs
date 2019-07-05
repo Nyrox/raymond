@@ -11,7 +11,6 @@ use core::{
 
 pub use core::Scene;
 
-
 #[derive(Clone)]
 pub struct Model {
 	pub mesh: Arc<Mesh>,

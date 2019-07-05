@@ -1,13 +1,8 @@
-use std::{
-	error::Error,
-	fs::File,
-	io::{self, Read, Write},
-	path::Path,
-};
+use std::{error::Error, fs::File, io::Write, path::Path};
 
 use serde::{Deserialize, Serialize};
 
-use crate::{primitives, prelude::*};
+use crate::{prelude::*, primitives};
 
 #[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
 pub enum SceneObject {
@@ -26,12 +21,17 @@ impl SceneObject {
 
 	pub fn get_surface_properties(&self, hit: Hit) -> SurfaceProperties {
 		match self {
-			&SceneObject::Plane(ref p, material) => SurfaceProperties { normal: p.get_normal_at (hit), material },
-			&SceneObject::Sphere(ref s, material) => SurfaceProperties { normal: s.get_normal_at (hit), material },
+			&SceneObject::Plane(ref p, material) => SurfaceProperties {
+				normal: p.get_normal_at(hit),
+				material,
+			},
+			&SceneObject::Sphere(ref s, material) => SurfaceProperties {
+				normal: s.get_normal_at(hit),
+				material,
+			},
 		}
 	}
 }
-
 
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub struct Scene {
@@ -39,18 +39,18 @@ pub struct Scene {
 }
 
 impl Scene {
-	pub fn new () -> Scene {
+	pub fn new() -> Scene {
 		Scene {
-			objects: Vec::new()
+			objects: Vec::new(),
 		}
 	}
 
-	pub fn load<P: AsRef<Path>> (path: P) -> Result<Scene, Box<Error>> {
+	pub fn load<P: AsRef<Path>>(path: P) -> Result<Scene, Box<dyn Error>> {
 		let f = File::open(path.as_ref())?;
 		Ok(ron::de::from_reader(f)?)
 	}
 
-	pub fn store<P: AsRef<Path>> (&self, path: P) -> Result<(), Box<Error>> {
+	pub fn store<P: AsRef<Path>>(&self, path: P) -> Result<(), Box<dyn Error>> {
 		let mut f = File::create(path.as_ref())?;
 		let s = ron::ser::to_string_pretty(self, Default::default())?;
 		f.write(s.as_bytes())?;

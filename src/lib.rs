@@ -9,7 +9,6 @@ pub mod acc_grid;
 pub mod mesh;
 pub mod scene;
 pub mod trace;
-pub mod transform;
 
 pub const F_MAX: f64 = ::std::f64::MAX;
 pub const PI: f64 = ::std::f64::consts::PI;

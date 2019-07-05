@@ -1,0 +1,21 @@
+(
+    camera: (
+        backbuffer_width: 1280,
+        backbuffer_height: 720,
+        fov_vert: 55,
+        transform: (
+            position: (
+                x: 0,
+                y: 0,
+                z: 0,
+            ),
+        ),
+        focal_length: 2.5,
+        aperture_radius: 0,
+    ),
+    trace: (
+        worker_count: Fixed(4),
+        samples_per_pixel: 5,
+        bounce_limit: 5,
+    ),
+)

@@ -6,7 +6,9 @@ edition="2018"
 
 [dependencies]
 raytracer={ path="../" }
-image="*"
-cgmath="*"
-simplelog="*"
 core={ path="../core" }
+image="*"
+simplelog="*"
+cgmath="*"
+structopt="0.2"
+ron="0.5"

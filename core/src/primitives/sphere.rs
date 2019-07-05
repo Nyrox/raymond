@@ -28,7 +28,7 @@ impl Intersect for Sphere {
 }
 
 impl Sphere {
-	pub fn get_normal_at (&self, hit: Hit) -> Vector3 {
+	pub fn get_normal_at(&self, hit: Hit) -> Vector3 {
 		((hit.ray.origin + hit.ray.direction * hit.distance) - self.origin).normalize()
 	}
 }

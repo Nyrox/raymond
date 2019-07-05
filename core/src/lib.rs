@@ -7,9 +7,13 @@ pub type Vector2 = cgmath::Vector2<f64>;
 
 pub mod primitives;
 pub mod scene;
+pub mod settings;
+pub mod transform;
 
 pub use primitives::{Hit, Ray, Vertex};
 pub use scene::{Scene, SceneObject};
+pub use settings::Settings;
+pub use transform::Transform;
 
 pub mod prelude {
 	pub use super::{
@@ -19,6 +23,7 @@ pub mod prelude {
 		Ray,
 		SurfaceProperties,
 		Traceable,
+		Transform,
 		Vector2,
 		Vector3,
 		Vertex,
@@ -28,8 +33,6 @@ pub mod prelude {
 	// usable without having to leak cgmath
 	pub use cgmath::{ElementWise, InnerSpace, MetricSpace};
 }
-
-use prelude::*;
 
 #[derive(PartialEq, Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum Material {

@@ -15,41 +15,16 @@ use std::{
 use crossbeam::queue::MsQueue;
 use rand;
 
-use num_cpus;
+use super::scene::*;
 
-use super::{scene::*, transform::Transform};
-
-use core::{prelude::*, primitives::Plane};
+use core::{prelude::*, primitives::Plane, settings::CameraSettings, Settings};
 
 use super::PI;
 
 use log::*;
 
-#[derive(Builder, Clone, Debug)]
-pub struct CameraSettings {
-	pub backbuffer_width: usize,
-	pub backbuffer_height: usize,
-	pub fov_vert: f64,
-	pub transform: Transform,
-	pub focal_length: f64,
-	pub aperture_radius: f64,
-}
-
-#[derive(Builder, Clone, Debug)]
-pub struct Settings {
-	#[builder(default = "num_cpus::get()")]
-	pub worker_count: usize,
-
-	pub camera_settings: CameraSettings,
-	pub sample_count: usize,
-	// The amount of samples per iteration
-	// If set to 0, the renderer will only notify the Receiver when a tile is
-	// fully rendered
-	#[builder(default = "0")]
-	pub samples_per_iteration: usize,
-	pub tile_size: (usize, usize),
-	pub bounce_limit: usize,
-}
+const TILE_SIZE: usize = 32;
+const SAMPLES_PER_ITERATION: usize = 1;
 
 struct TraceContext {
 	pub scene: Scene,
@@ -62,7 +37,7 @@ pub enum Message {
 	TileProgressed(super::Tile),
 }
 
-pub type TileCallback = Box<Fn(super::Tile) -> ()>;
+pub type TileCallback = Box<dyn Fn(super::Tile) -> ()>;
 
 pub struct TaskHandle {
 	pub receiver: mpsc::Receiver<Message>,
@@ -79,8 +54,8 @@ impl TaskHandle {
 	pub fn r#await(&self) -> Vec<Vector3> {
 		let mut out = vec![
 			Vector3::new(0.0, 0.0, 0.0);
-			self.settings.camera_settings.backbuffer_width
-				* self.settings.camera_settings.backbuffer_height
+			self.settings.camera.backbuffer_width
+				* self.settings.camera.backbuffer_height
 		];
 
 		'poll: loop {
@@ -95,13 +70,12 @@ impl TaskHandle {
 
 									out[x
 										+ tile.left + (y + tile.top)
-										* self.settings.camera_settings.backbuffer_width] = s;
+										* self.settings.camera.backbuffer_width] = s;
 								}
 							}
 						}
-						_ => {
-							break 'collect;
-						}
+						Err (_) => { break 'collect; }
+						_ => {}
 					}
 				}
 
@@ -143,8 +117,8 @@ pub fn render_tiled(scene: Scene, settings: Settings) -> TaskHandle {
 		'gen_tiles: loop {
 			let tile_min = (x, y);
 			let tile_max = (
-				(x + settings.tile_size.0).min(settings.camera_settings.backbuffer_width),
-				(y + settings.tile_size.1).min(settings.camera_settings.backbuffer_height),
+				(x + TILE_SIZE).min(settings.camera.backbuffer_width),
+				(y + TILE_SIZE).min(settings.camera.backbuffer_height),
 			);
 			let width = tile_max.0 - tile_min.0;
 			let height = tile_max.1 - tile_min.1;
@@ -158,19 +132,19 @@ pub fn render_tiled(scene: Scene, settings: Settings) -> TaskHandle {
 				data: vec![Vector3::new(0.0, 0.0, 0.0); width * height],
 			});
 
-			y += settings.tile_size.1;
-			if y >= settings.camera_settings.backbuffer_height {
+			y += TILE_SIZE;
+			if y >= settings.camera.backbuffer_height {
 				y = 0;
-				x += settings.tile_size.0;
+				x += TILE_SIZE;
 			}
-			if x >= settings.camera_settings.backbuffer_width {
+			if x >= settings.camera.backbuffer_width {
 				break 'gen_tiles;
 			}
 		}
 	}
 
-	let thread_count = Arc::new(AtomicUsize::new(settings.worker_count));
-	for _ in 0..settings.worker_count {
+	let thread_count = Arc::new(AtomicUsize::new(settings.trace.worker_count.get()));
+	for _ in 0..settings.trace.worker_count.get() {
 		let queue = queue.clone();
 		let sender = sender.clone();
 
@@ -193,7 +167,7 @@ pub fn render_tiled(scene: Scene, settings: Settings) -> TaskHandle {
 
 			for y in tile.top..(tile.top + tile.height) {
 				for x in tile.left..(tile.left + tile.width) {
-					let primary = generate_primary_ray(x, y, &context.settings.camera_settings);
+					let primary = generate_primary_ray(x, y, &context.settings.camera);
 					let sample = trace(primary, &context, 1);
 
 					// Map the global pixel indices to the local tile buffer and
@@ -206,15 +180,13 @@ pub fn render_tiled(scene: Scene, settings: Settings) -> TaskHandle {
 			info!(target: "TraceCore", "Tile[{:4}, {:4}] finished sample [{}]", tile.left, tile.top, tile.sample_count);
 
 			// Check if we are done
-			if tile.sample_count == context.settings.sample_count {
+			if tile.sample_count == context.settings.trace.samples_per_pixel {
 				sender.send(Message::TileFinished(tile.clone())).unwrap();
 			} else {
 				queue.push(tile.clone());
 
 				// Check if we want to send our tile down the pipe
-				if context.settings.samples_per_iteration != 0
-					&& tile.sample_count % context.settings.samples_per_iteration == 0
-				{
+				if SAMPLES_PER_ITERATION != 0 && tile.sample_count % SAMPLES_PER_ITERATION == 0 {
 					sender.send(Message::TileProgressed(tile.clone())).unwrap();
 				}
 			}
@@ -232,7 +204,7 @@ pub fn render_tiled(scene: Scene, settings: Settings) -> TaskHandle {
 fn trace(ray: Ray, context: &TraceContext, depth: usize) -> Vector3 {
 	let settings = &context.settings;
 
-	if depth > settings.bounce_limit {
+	if depth > settings.trace.bounce_limit {
 		return Vector3::new(0.0, 0.0, 0.0);
 	}
 
@@ -244,7 +216,8 @@ fn trace(ray: Ray, context: &TraceContext, depth: usize) -> Vector3 {
 	let surface_properties = object.get_surface_properties(hit);
 	let normal = surface_properties.normal;
 	let fragment_position = ray.origin + ray.direction * hit.distance;
-	let (material_color, material_roughness, material_metalness) = match surface_properties.material {
+	let (material_color, material_roughness, material_metalness) = match surface_properties.material
+	{
 		Material::Diffuse(color, roughness) => (color, roughness, 0.0),
 		Material::Metal(color, roughness) => (color, roughness, 1.0),
 		Material::Emission(e, _, _, _) => {
@@ -255,7 +228,9 @@ fn trace(ray: Ray, context: &TraceContext, depth: usize) -> Vector3 {
 
 	// for light in context.scene.lights.iter() {}
 
-	let view_dir = (settings.camera_settings.transform.position - fragment_position).normalize();
+	// FIX FIX FIX
+	let view_dir = (ray.origin - fragment_position).normalize();
+
 	let f0 = Vector3::new(0.04, 0.04, 0.04);
 	let f0 = lerp_vec(f0, material_color, material_metalness);
 	// Decide whether to sample diffuse or specular
