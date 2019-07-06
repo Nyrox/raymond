@@ -230,7 +230,6 @@ fn trace(ray: Ray, context: &TraceContext, depth: usize) -> Vector3 {
 
 	// FIX FIX FIX
 	let view_dir = (ray.origin - fragment_position).normalize();
-        let view_dir = (settings.camera.transform.position - fragment_position).normalize();
 
 	let f0 = Vector3::new(0.04, 0.04, 0.04);
 	let f0 = lerp_vec(f0, material_color, material_metalness);
