@@ -230,6 +230,7 @@ fn trace(ray: Ray, context: &TraceContext, depth: usize) -> Vector3 {
 
 	// FIX FIX FIX
 	let view_dir = (ray.origin - fragment_position).normalize();
+        let view_dir = (settings.camera.transform.position - fragment_position).normalize();
 
 	let f0 = Vector3::new(0.04, 0.04, 0.04);
 	let f0 = lerp_vec(f0, material_color, material_metalness);
@@ -239,7 +240,7 @@ fn trace(ray: Ray, context: &TraceContext, depth: usize) -> Vector3 {
 	let local_cartesian_transform =
 		cgmath::Matrix3::from_cols(local_cartesian.0, normal, local_cartesian.1);
 	let prob_d = lerp(0.5, 0.0, material_metalness);
-	if r < prob_d {
+        if r < prob_d {
 		let (sample, pdf) = uniform_sample_hemisphere();
 		let sample_world = (local_cartesian_transform * sample).normalize();
 		let radiance = trace(
