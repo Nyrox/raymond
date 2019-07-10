@@ -239,7 +239,7 @@ fn trace(ray: Ray, context: &TraceContext, depth: usize) -> Vector3 {
 	let local_cartesian_transform =
 		cgmath::Matrix3::from_cols(local_cartesian.0, normal, local_cartesian.1);
 	let prob_d = lerp(0.5, 0.0, material_metalness);
-	if r < prob_d {
+        if r < prob_d {
 		let (sample, pdf) = uniform_sample_hemisphere();
 		let sample_world = (local_cartesian_transform * sample).normalize();
 		let radiance = trace(
