@@ -2,7 +2,7 @@
 name = "raytracer"
 version = "0.1.0"
 authors = ["Nyrox <root@nyrox.tech>"]
-edition="2018" 
+edition="2018"
 
 [dependencies]
 cgmath={version="0.17", features=["serde"]}
@@ -24,7 +24,7 @@ core={path="./core"}
 [workspace]
 members=[
 	"cli",
-
+	"azul-editor",
 	"core",
 ]
 exclude=[
