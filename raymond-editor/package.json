@@ -1,0 +1,44 @@
+{
+  "name": "raymond-editor",
+  "version": "1.0.0",
+  "description": "",
+  "main": "main.js",
+  "scripts": {
+    "main:build": "tsc",
+    "main:start": "electron ./build-main/main.js",
+    "main:dev": "yarn main:build && yarn main:start",
+    "client:dev": "webpack-dev-server --config webpack.config.js",
+    "client:build": "webpack",
+    "dev": "npm-run-all --parallel --race main:dev client:dev"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@babel/core": "^7.6.2",
+    "@babel/preset-env": "^7.6.2",
+    "@babel/preset-react": "^7.0.0",
+    "@babel/preset-typescript": "^7.6.0",
+
+    "babel-loader": "^8.0.6",
+    "copy-webpack-plugin": "^5.0.4",
+    "electron": "^6.0.10",
+    "html-webpack-plugin": "^3.2.0",
+    "react": "^16.9.0",
+    "react-dom": "^16.9.0",
+    "react-three-fiber": "^2.4.3",
+    "three": "^0.108.0",
+    "webpack": "^4.41.0",
+    "webpack-cli": "^3.3.9",
+    "webpack-merge": "^4.2.2"
+  },
+  "dependencies": {
+    "@types/node": "^12.7.8",
+    "@types/react": "^16.9.3",
+    "@types/react-dom": "^16.9.1",
+    "npm-run-all": "^4.1.5",
+    "typescript": "^3.6.3",
+    "webpack-dev-server": "^3.8.1",
+    "@emotion/core": "^10.0.17",
+    "@emotion/styled": "^10.0.17"
+  }
+}
