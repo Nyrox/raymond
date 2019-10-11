@@ -33,6 +33,7 @@ impl SceneObject {
 	}
 }
 
+
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub struct Scene {
 	pub objects: Vec<SceneObject>,
@@ -47,12 +48,12 @@ impl Scene {
 
 	pub fn load<P: AsRef<Path>>(path: P) -> Result<Scene, Box<dyn Error>> {
 		let f = File::open(path.as_ref())?;
-		Ok(ron::de::from_reader(f)?)
+		Ok(serde_json::de::from_reader(f)?)
 	}
 
 	pub fn store<P: AsRef<Path>>(&self, path: P) -> Result<(), Box<dyn Error>> {
 		let mut f = File::create(path.as_ref())?;
-		let s = ron::ser::to_string_pretty(self, Default::default())?;
+		let s = serde_json::to_string_pretty(self)?;
 		f.write(s.as_bytes())?;
 
 		Ok(())

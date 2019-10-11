@@ -9,11 +9,11 @@ use core::Scene;
 #[test]
 fn scene_load_and_store() {
 	let input_path = format!(
-		"{}/tests/resources/basic_scene/scene.ron",
+		"{}/tests/resources/basic_scene/scene.json",
 		env!("CARGO_MANIFEST_DIR")
 	);
 	let output_path = format!(
-		"{}/tests/resources/basic_scene/scene_parsed.ron",
+		"{}/tests/resources/basic_scene/scene_parsed.json",
 		env!("CARGO_MANIFEST_DIR")
 	);
 

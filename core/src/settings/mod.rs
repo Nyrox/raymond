@@ -67,6 +67,6 @@ pub struct Settings {
 impl Settings {
 	pub fn load<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn Error>> {
 		let f = File::open(path.as_ref())?;
-		Ok(ron::de::from_reader(f)?)
+		Ok(serde_json::de::from_reader(f)?)
 	}
 }

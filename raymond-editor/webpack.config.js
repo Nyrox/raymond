@@ -28,6 +28,7 @@ const baseConfig = {
                             "@babel/preset-typescript",
                         ],
                         plugins: [
+                            "transform-class-properties",
                         ],
                     },
                 },

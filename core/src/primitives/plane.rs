@@ -5,7 +5,6 @@ use serde::{Deserialize, Serialize};
 pub struct Plane {
 	pub origin: Vector3,
 	pub normal: Vector3,
-	#[serde(default=None)]
 	pub radius: Option<f64>,
 }
 
