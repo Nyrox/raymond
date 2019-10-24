@@ -1,6 +1,7 @@
 use raytracer::{acc_grid, mesh::Mesh, scene::Light};
 
 use core::{prelude::*, primitives::*, Scene, SceneObject, Settings};
+use std::net::{TcpListener, TcpStream};
 
 use cgmath::Vector3;
 use std::cell::RefCell;
@@ -19,7 +20,8 @@ use std::{
 
 use std::fs::File;
 
-use std::io::prelude::*;
+use serde::{Deserialize, Serialize};
+use std::{io::prelude::*, rc::Rc};
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
@@ -36,16 +38,23 @@ enum Opt {
 		scene: PathBuf,
 		#[structopt(short = "c", long)]
 		config: Option<PathBuf>,
+		#[structopt(long)]
+		host: Option<String>,
 	},
 }
 
+use std::mem;
+
 fn main() -> Result<(), Box<dyn ::std::error::Error>> {
 	use simplelog::*;
-	CombinedLogger::init(vec![WriteLogger::new(
-		LevelFilter::Info,
-		Config::default(),
-		File::create("trace.log").unwrap(),
-	)]);
+	CombinedLogger::init(vec![
+		WriteLogger::new(
+			LevelFilter::Trace,
+			Config::default(),
+			File::create("trace.log").unwrap(),
+		),
+		TermLogger::new(LevelFilter::Info, Config::default(), TerminalMode::Mixed).unwrap(),
+	]);
 
 	match Opt::from_args() {
 		Opt::DumpConfig { out } => {
@@ -55,7 +64,11 @@ fn main() -> Result<(), Box<dyn ::std::error::Error>> {
 
 			f.write(settings.as_bytes())?;
 		}
-		Opt::Render { config, scene } => {
+		Opt::Render {
+			config,
+			scene,
+			host,
+		} => {
 			// Load the tracer settings
 			let settings = match config {
 				Some(ref p) => Settings::load(p)?,
@@ -74,10 +87,116 @@ fn main() -> Result<(), Box<dyn ::std::error::Error>> {
 
 			let now = Instant::now();
 
-			let task_handle = trace::render_tiled(scene, settings.clone());
-			let render = task_handle.r#await();
+			let mut task_handle = trace::render_tiled(scene, settings.clone());
 
-			let final_image = render;
+			#[derive(Clone, Serialize, Deserialize)]
+			pub struct MessageHeader {
+				pub sample_count: u32,
+				pub width: u32,
+				pub height: u32,
+				pub left: u32,
+				pub top: u32,
+			}
+
+			#[derive(Clone, Serialize, Deserialize)]
+			pub struct MessageBody<'a> {
+				#[serde(with = "serde_bytes")]
+				pub data: &'a [u8],
+			}
+
+			use log::info;
+			info!("Message Header Length: {}", mem::size_of::<MessageHeader>());
+
+			let final_image = match host {
+				Some(ref hostname) => {
+					let listener = TcpListener::bind(hostname)?;
+					listener.set_nonblocking(true);
+					let mut streams = Vec::new();
+
+					let mut out = Rc::new(RefCell::new(vec![
+						Vector3::new(0.0, 0.0, 0.0);
+						settings.camera.backbuffer_height
+							* settings.camera.backbuffer_width
+					]));
+					let _out = out.clone();
+					let settings = settings.clone();
+
+					task_handle.set_callback(Some(Box::new(move |mut tile| {
+						let binaryData = unsafe {
+							std::slice::from_raw_parts(
+								tile.data.as_mut_ptr() as *mut u8,
+								mem::size_of::<Vector3<f64>>() * tile.data.len(),
+							)
+						};
+
+						for y in 0..tile.height {
+							for x in 0..tile.width {
+								let bF = (binaryData.as_ptr() as *const f64);
+								let s = unsafe {
+									Vector3::new(
+										*(bF.offset((3 * (x + y * tile.width) + 0) as isize)),
+										*(bF.offset((3 * (x + y * tile.width) + 1) as isize)),
+										*(bF.offset((3 * (x + y * tile.width) + 2) as isize)),
+									)
+								};
+
+								let s = tile.data[x + y * tile.width] / tile.sample_count as f64;
+
+								out.borrow_mut()[x
+									+ tile.left + (y + tile.top)
+									* settings.camera.backbuffer_width] = s;
+							}
+						}
+
+						match listener.accept() {
+							Ok((socket, addr)) => {
+								println!("Received new connection on addr: {}", addr);
+								socket.set_nonblocking(false);
+								streams.push(socket);
+							}
+							Err(_) => {}
+						}
+
+						for (i, stream) in streams.iter_mut().enumerate() {
+							let header = MessageHeader {
+								sample_count: tile.sample_count as u32,
+								width: tile.width as u32,
+								height: tile.height as u32,
+								left: tile.left as u32,
+								top: tile.top as u32,
+							};
+
+							let body = MessageBody {
+								data: unsafe {
+									std::slice::from_raw_parts(
+										tile.data.as_mut_ptr() as *mut u8,
+										mem::size_of::<Vector3<f64>>() * tile.data.len(),
+									)
+								},
+							};
+
+							// handle outgoing
+							// let json = rmp_serde::to_vec(&message).expect("suka blyat");
+							let header_data = unsafe {
+								std::slice::from_raw_parts(
+									(&header as *const MessageHeader) as *const u8,
+									mem::size_of::<MessageHeader>(),
+								)
+							};
+
+							let body_data = body.data;
+
+							stream.write_all(&header_data).expect("failed to send header");
+							stream.write_all(&body_data).expect("failed to send body");
+						}
+					})));
+
+					task_handle.async_await();
+					let v = _out.borrow().clone();
+					v
+				}
+				None => task_handle.r#await(),
+			};
 
 			fn element_wise_map<Fun: Fn(f64) -> f64>(vec: &Vector3<f64>, f: Fun) -> Vector3<f64> {
 				Vector3::new(f(vec.x), f(vec.y), f(vec.z))

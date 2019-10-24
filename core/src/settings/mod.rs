@@ -52,7 +52,7 @@ impl Default for TraceSettings {
 	fn default() -> Self {
 		TraceSettings {
 			worker_count: WorkerCount::Auto,
-			samples_per_pixel: 30,
+			samples_per_pixel: 10,
 			bounce_limit: 5,
 		}
 	}

@@ -35,9 +35,10 @@ struct TraceContext {
 pub enum Message {
 	TileFinished(super::Tile),
 	TileProgressed(super::Tile),
+	RenderFinished(),
 }
 
-pub type TileCallback = Box<dyn Fn(super::Tile) -> ()>;
+pub type TileCallback = Box<dyn FnMut(super::Tile) -> ()>;
 
 pub struct TaskHandle {
 	pub receiver: mpsc::Receiver<Message>,
@@ -51,7 +52,7 @@ impl TaskHandle {
 		self.callback = callback;
 	}
 
-	pub fn r#await(&self) -> Vec<Vector3> {
+	pub fn r#await(&mut self) -> Vec<Vector3> {
 		let mut out = vec![
 			Vector3::new(0.0, 0.0, 0.0);
 			self.settings.camera.backbuffer_width
@@ -87,20 +88,24 @@ impl TaskHandle {
 		out
 	}
 
-	pub fn async_await(&self) -> () {
+	pub fn async_await(&mut self) -> () {
 		'collect: loop {
 			match self.receiver.try_recv() {
 				Ok(Message::TileProgressed(tile)) => {
-					println!("CB");
-					if let Some(cb) = &self.callback {
+					if let Some(cb) = &mut self.callback {
 						cb(tile);
 					}
-				}
-				_ => {
+				},
+				Ok(Message::TileFinished(tile)) => {
+					if let Some(cb) = &mut self.callback {
+						cb(tile);
+					}
+				},
+				Ok(Message::RenderFinished()) => {
 					break 'collect;
-				}
+				},
+				Err(e) => {}
 			}
-			thread::sleep(Duration::from_millis(200));
 		}
 	}
 }
@@ -177,11 +182,14 @@ pub fn render_tiled(scene: Scene, settings: Settings) -> TaskHandle {
 			}
 
 			tile.sample_count += 1;
-			info!(target: "TraceCore", "Tile[{:4}, {:4}] finished sample [{}]", tile.left, tile.top, tile.sample_count);
+			trace!(target: "TraceCore", "Tile[{:4}, {:4}] finished sample [{}]", tile.left, tile.top, tile.sample_count);
 
 			// Check if we are done
 			if tile.sample_count == context.settings.trace.samples_per_pixel {
 				sender.send(Message::TileFinished(tile.clone())).unwrap();
+				if queue.is_empty() {
+					sender.send(Message::RenderFinished()).unwrap();
+				}
 			} else {
 				queue.push(tile.clone());
 

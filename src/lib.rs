@@ -24,6 +24,7 @@ pub struct Tile {
 	pub height: usize,
 	pub left: usize,
 	pub top: usize,
+	
 	pub data: Vec<Vector3>,
 }
 
