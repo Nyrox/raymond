@@ -4,13 +4,15 @@ A monte carlo path tracer utilizing cook-torrance physically based rendering.
 
 ## Features Implemented
 
-- PBR Diffuse and Specular Rendering
+- PBR Diffuse and Specular Rendering (Cook-Torrance)
 - Cosine-Weighted Sampling Diffuse Sampling
+- Aperture Sampling (Bokeh, Depth of Field)
+- Acceleration Grid for Mesh Tracing (DDA)
+- Progressive Tile Rendering
 
 # Todo
 
 - Implement multiple BRDF's
-- Ratify a Scene Format
 - Next Event Sampling
 - MIS
 - Volumetrics
@@ -23,7 +25,7 @@ A monte carlo path tracer utilizing cook-torrance physically based rendering.
 ![Reflective Spheres](examples/ReflectiveSpheres.png)
 
 500spp - 5 Bounces Max - Total Time: 1000s [4 core i5]
-![Golden Dragon](examples/GoldenDragon.png)
+![Golden Dragon](examples/GoldDragon.png)
 
 ## Future Work
 
