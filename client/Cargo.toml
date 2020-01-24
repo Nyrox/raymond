@@ -1,5 +1,5 @@
 [package]
-name = "cli"
+name = "client"
 version = "0.1.0"
 authors = ["Mark Junge <mark.oliver@hotmail.de>"]
 edition = "2018"
@@ -7,7 +7,3 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-structopt="0.3"
-minifb="0.15.3"
-core = {path="../core"}
-raytracer = {path="../"}

@@ -106,6 +106,10 @@ impl TaskHandle {
 		out
 	}
 
+	pub fn poll(&self) -> Option<Message> {
+		self.receiver.try_recv().ok()
+	}
+
 	pub fn async_await(&self) -> () {
 		'collect: loop {
 			match self.receiver.try_recv() {
