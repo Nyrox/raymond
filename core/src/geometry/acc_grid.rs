@@ -1,9 +1,5 @@
-use super::mesh::Mesh;
-
-use core::{
-	prelude::*,
-	primitives::{Triangle, AABB},
-};
+use crate::math::prelude::*;
+use crate::geometry::{Mesh, Triangle, AABB, Hit, SurfaceProperties, Ray, Intersect};
 
 const GRID_DENSITY_BIAS: f64 = 3.0;
 

@@ -1,13 +1,12 @@
 use std::{fs, path::PathBuf};
 
-use super::{F_MAX, PI};
-
-use core::{
-	prelude::*,
-	primitives::{Triangle, AABB},
+use crate::{
+	math::consts::F_MAX,
+	math::prelude::*,
+	geometry::{Triangle, AABB, Ray, Hit, Intersect, SurfaceProperties, Vertex},
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Mesh {
 	pub triangles: Vec<Triangle>,
 	pub bounding_box: AABB,

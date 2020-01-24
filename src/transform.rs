@@ -1,8 +1,8 @@
-use cgmath::Vector3;
+use core::math::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Transform {
-	pub position: Vector3<f64>,
+	pub position: Vector3,
 }
 
 impl Transform {

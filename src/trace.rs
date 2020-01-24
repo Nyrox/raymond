@@ -15,9 +15,15 @@ use rand;
 
 use num_cpus;
 
-use super::{scene::*, transform::Transform};
+use super::{transform::Transform};
 
-use core::{prelude::*, primitives::Plane};
+use core::{
+	prelude::*,
+	math::prelude::*,
+	tile::Tile,
+	geometry::*,
+	scene::Scene,
+};
 
 use super::PI;
 
@@ -55,11 +61,11 @@ struct TraceContext {
 
 #[derive(Clone, Debug)]
 pub enum Message {
-	TileFinished(super::Tile),
-	TileProgressed(super::Tile),
+	TileFinished(Tile),
+	TileProgressed(Tile),
 }
 
-pub type TileCallback = Box<Fn(super::Tile) -> ()>;
+pub type TileCallback = Box<Fn(Tile) -> ()>;
 
 pub struct TaskHandle {
 	pub receiver: mpsc::Receiver<Message>,
@@ -146,7 +152,7 @@ pub fn render_tiled(scene: Scene, settings: Settings) -> TaskHandle {
 			let width = tile_max.0 - tile_min.0;
 			let height = tile_max.1 - tile_min.1;
 
-			queue.push(super::Tile {
+			queue.push(Tile {
 				sample_count: 0,
 				left: tile_min.0,
 				top: tile_min.1,
@@ -235,23 +241,21 @@ fn trace(ray: Ray, context: &TraceContext, depth: usize) -> Vector3 {
 		Some((o, h)) => (o, h),
 		None => return Vector3::new(0.0, 0.0, 0.0),
 	};
-	let surface_properties = object.get_surface_properties(hit);
+	let surface_properties = object.geometry.get_surface_properties(hit);
 	let normal = surface_properties.normal;
 	let fragment_position = ray.origin + ray.direction * hit.distance;
-	let (material_color, material_roughness, material_metalness) = match object.get_material() {
-		Material::Diffuse(color, roughness) => (color, *roughness, 0.0),
-		Material::Metal(color, roughness) => (color, *roughness, 1.0),
+	let (material_color, material_roughness, material_metalness) = match object.material {
+		Material::Diffuse(color, roughness) => (color, roughness, 0.0),
+		Material::Metal(color, roughness) => (color, roughness, 1.0),
 		Material::Emission(e, _, _, _) => {
-			return *e;
+			return e;
 		}
 		_ => panic!(),
 	};
 
-	for light in context.scene.lights.iter() {}
-
 	let view_dir = (settings.camera_settings.transform.position - fragment_position).normalize();
 	let f0 = Vector3::new(0.04, 0.04, 0.04);
-	let f0 = lerp_vec(f0, *material_color, material_metalness);
+	let f0 = lerp_vec(f0, material_color, material_metalness);
 	// Decide whether to sample diffuse or specular
 	let r = rand::random::<f64>();
 	let local_cartesian = create_coordinate_system_of_n(normal);
@@ -274,7 +278,7 @@ fn trace(ray: Ray, context: &TraceContext, depth: usize) -> Vector3 {
 		let specular_part = fresnel;
 		let mut diffuse_part = Vector3::new(1.0, 1.0, 1.0) - specular_part;
 		diffuse_part *= 1.0 - material_metalness;
-		let output = (diffuse_part.mul_element_wise(*material_color)).mul_element_wise(radiance) * cos_theta;
+		let output = (diffuse_part.mul_element_wise(material_color)).mul_element_wise(radiance) * cos_theta;
 		return output / (prob_d * pdf);
 	} else {
 		// Sample specular
@@ -346,7 +350,6 @@ fn generate_primary_ray_with_dof(x: usize, y: usize, camera: &CameraSettings) ->
 	let focal_plane = Plane {
 		origin: camera.transform.position + Vector3::new(0.0, 0.0, 1.0) * camera.focal_length,
 		normal: Vector3::new(0.0, 0.0, -1.0),
-		material: Material::Diffuse(Vector3::new(0.75, 0.75, 0.75), 0.5),
 	};
 	let end = camera.transform.position + focal_plane.intersects(primary).unwrap().distance * primary.direction;
 

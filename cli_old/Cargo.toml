@@ -1,8 +1,8 @@
 [package]
-name = "cli"
+name = "cli_old"
 version = "0.1.0"
 authors = ["Nyrox <mark.oliver@hotmail.de>"]
-edition="2018" 
+edition="2018"
 
 [dependencies]
 raytracer={ path="../" }

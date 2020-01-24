@@ -28,6 +28,7 @@ members=[
 	"server",
 	"core",
 	"client",
+	"cli_old"
 ]
 exclude=[
 	"editor\\frontend"

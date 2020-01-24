@@ -1,6 +1,10 @@
-use crate::{prelude::*, primitives::AABB};
 
-#[derive(Debug)]
+use crate::geometry::{Vertex};
+use crate::geometry::{AABB, Intersect, Ray, Hit, SurfaceProperties};
+use crate::math::prelude::*;
+use serde::{Serialize, Deserialize};
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct Triangle(pub Vertex, pub Vertex, pub Vertex);
 
 impl Intersect for Triangle {
@@ -60,7 +64,6 @@ impl Triangle {
 
 		return SurfaceProperties {
 			normal: normal.normalize(),
-			material: Material::Diffuse(Vector3::new(0.0, 0.0, 0.0), 0.5),
 		};
 	}
 
