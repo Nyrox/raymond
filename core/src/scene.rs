@@ -1,9 +1,10 @@
 use std::sync::Arc;
 
-use crate::math::prelude::*;
-use crate::geometry::{AccGrid, Mesh, Plane, Sphere, Triangle, Ray, Hit, SurfaceProperties, Intersect};
-use crate::Material;
-
+use crate::{
+	geometry::{AccGrid, Hit, Intersect, Mesh, Plane, Ray, Sphere, SurfaceProperties, Triangle},
+	math::prelude::*,
+	Material,
+};
 
 #[derive(Clone)]
 pub enum Geometry {
@@ -36,8 +37,7 @@ pub struct Object {
 	pub material: Material,
 }
 
-impl Object {
-}
+impl Object {}
 
 #[derive(Clone)]
 pub struct Scene {
@@ -46,9 +46,7 @@ pub struct Scene {
 
 impl Scene {
 	pub fn new() -> Scene {
-		Scene {
-			objects: Vec::new(),
-		}
+		Scene { objects: Vec::new() }
 	}
 
 	pub fn intersect(&self, ray: Ray) -> Option<(&Object, Hit)> {

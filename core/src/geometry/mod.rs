@@ -1,6 +1,6 @@
-pub mod primitives;
-pub mod mesh;
 pub mod acc_grid;
+pub mod mesh;
+pub mod primitives;
 
 use crate::math::prelude::*;
 
@@ -54,7 +54,8 @@ pub trait Traceable: Intersect {
 	fn get_surface_properties(&self, hit: Hit) -> SurfaceProperties;
 }
 
-
 pub use self::{
-	primitives::{AABB, Sphere, Plane, Triangle, Vertex}, mesh::Mesh, acc_grid::AccGrid
+	acc_grid::AccGrid,
+	mesh::Mesh,
+	primitives::{Plane, Sphere, Triangle, Vertex, AABB},
 };

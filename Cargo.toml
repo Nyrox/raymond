@@ -25,9 +25,7 @@ core={path="./core"}
 [workspace]
 members=[
 	"cli",
-	"server",
 	"core",
-	"client",
 	"cli_old"
 ]
 exclude=[

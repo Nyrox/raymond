@@ -31,7 +31,7 @@ impl WatcherHandle {
 }
 
 pub enum ToWatcher {
-	TileProgress(core::Tile)
+	TileProgress(core::Tile),
 }
 
 pub enum FromWatcher {
@@ -82,7 +82,6 @@ pub fn start_watcher(width: usize, height: usize) -> Result<WatcherHandle, minif
 							let data = ix << 16 | iy << 8 | iz << 0 | 0xFF << 24;
 
 							buffer[(x + y * width)] = data;
-
 						}
 					}
 					window.update_with_buffer(&buffer, width, height).unwrap();
@@ -90,7 +89,6 @@ pub fn start_watcher(width: usize, height: usize) -> Result<WatcherHandle, minif
 				Err(_) => (),
 				_ => unimplemented!(),
 			}
-
 
 			window.update();
 		}

@@ -15,15 +15,9 @@ use rand;
 
 use num_cpus;
 
-use super::{transform::Transform};
+use super::transform::Transform;
 
-use core::{
-	prelude::*,
-	math::prelude::*,
-	tile::Tile,
-	geometry::*,
-	scene::Scene,
-};
+use core::{geometry::*, prelude::*, scene::Scene, tile::Tile};
 
 use super::PI;
 
@@ -65,7 +59,7 @@ pub enum Message {
 	TileProgressed(Tile),
 }
 
-pub type TileCallback = Box<Fn(Tile) -> ()>;
+pub type TileCallback = Box<dyn Fn(Tile) -> ()>;
 
 pub struct TaskHandle {
 	pub receiver: mpsc::Receiver<Message>,

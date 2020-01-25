@@ -1,8 +1,8 @@
-
-use crate::geometry::{Vertex};
-use crate::geometry::{AABB, Intersect, Ray, Hit, SurfaceProperties};
-use crate::math::prelude::*;
-use serde::{Serialize, Deserialize};
+use crate::{
+	geometry::{Hit, Intersect, Ray, SurfaceProperties, Vertex, AABB},
+	math::prelude::*,
+};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct Triangle(pub Vertex, pub Vertex, pub Vertex);

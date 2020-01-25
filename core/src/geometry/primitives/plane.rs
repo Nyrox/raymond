@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct Plane {
@@ -25,9 +25,7 @@ impl Intersect for Plane {
 }
 
 impl Plane {
-	pub fn get_surface_properties(&self, hit: Hit) -> SurfaceProperties {
-		SurfaceProperties {
-			normal: self.normal,
-		}
+	pub fn get_surface_properties(&self, _hit: Hit) -> SurfaceProperties {
+		SurfaceProperties { normal: self.normal }
 	}
 }

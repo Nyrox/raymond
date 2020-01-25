@@ -1,15 +1,18 @@
-use crate::scene::{Scene};
-use crate::geometry::{Plane, Sphere, Mesh};
-use crate::scene;
-use crate::Material;
-use crate::geometry::AccGrid;
+use crate::{
+	geometry::{AccGrid, Mesh, Plane, Sphere},
+	scene,
+	scene::Scene,
+	Material,
+};
 
-use std::sync::Arc;
-use std::path::{Path, PathBuf};
-use std::fs::File;
-use std::io::Write;
+use std::{
+	fs::File,
+	io::Write,
+	path::{Path, PathBuf},
+	sync::Arc,
+};
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
 pub enum Geometry {
@@ -17,7 +20,6 @@ pub enum Geometry {
 	Sphere(Sphere),
 	Mesh(PathBuf),
 }
-
 
 #[derive(Serialize, Deserialize)]
 pub struct Object {
@@ -32,9 +34,7 @@ pub struct Project {
 
 impl Project {
 	pub fn new() -> Project {
-		Project {
-			objects: Vec::new(),
-		}
+		Project { objects: Vec::new() }
 	}
 
 	pub fn save(&self, p: impl AsRef<Path>) -> Result<(), Box<dyn std::error::Error>> {
@@ -58,13 +58,9 @@ impl Project {
 				geometry: match obj.geometry {
 					Geometry::Plane(p) => scene::Geometry::Plane(p),
 					Geometry::Sphere(s) => scene::Geometry::Sphere(s),
-					Geometry::Mesh(m) => {
-						scene::Geometry::Grid(
-							Arc::new(AccGrid::build_from_mesh(Mesh::load_ply(m)))
-						)
-					}
+					Geometry::Mesh(m) => scene::Geometry::Grid(Arc::new(AccGrid::build_from_mesh(Mesh::load_ply(m)))),
 				},
-				material: obj.material
+				material: obj.material,
 			});
 		}
 

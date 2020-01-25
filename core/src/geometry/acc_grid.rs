@@ -1,5 +1,7 @@
-use crate::math::prelude::*;
-use crate::geometry::{Mesh, Triangle, AABB, Hit, SurfaceProperties, Ray, Intersect};
+use crate::{
+	geometry::{Hit, Intersect, Mesh, Ray, SurfaceProperties, AABB},
+	math::prelude::*,
+};
 
 const GRID_DENSITY_BIAS: f64 = 3.0;
 

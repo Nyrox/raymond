@@ -1,9 +1,8 @@
 use std::{fs, path::PathBuf};
 
 use crate::{
-	math::consts::F_MAX,
-	math::prelude::*,
-	geometry::{Triangle, AABB, Ray, Hit, Intersect, SurfaceProperties, Vertex},
+	geometry::{Hit, Intersect, Ray, SurfaceProperties, Triangle, Vertex, AABB},
+	math::{consts::F_MAX, prelude::*},
 };
 
 #[derive(Debug, Clone)]
@@ -46,7 +45,7 @@ impl Mesh {
 	}
 
 	pub fn bake_transform(&mut self, translate: Vector3) {
-		for mut triangle in self.triangles.iter_mut() {
+		for triangle in self.triangles.iter_mut() {
 			triangle.0.position += translate;
 			triangle.1.position += translate;
 			triangle.2.position += translate;
@@ -78,8 +77,8 @@ impl Mesh {
 
 		// Parse vertices
 		for _ in 0..vertices.capacity() {
-			let mut line = lines.next().unwrap();
-			let mut tokens = line.split_whitespace();
+			let line = lines.next().unwrap();
+			let tokens = line.split_whitespace();
 			let values = tokens.map(|t| t.parse::<f64>().unwrap()).collect::<Vec<f64>>();
 			vertices.push(Vertex {
 				position: Vector3::new(values[0], values[1], values[2]),
@@ -91,12 +90,12 @@ impl Mesh {
 
 		// Parse faces
 		'faces: while let Some(line) = lines.next() {
-			let mut tokens = line.split_whitespace();
+			let tokens = line.split_whitespace();
 			let values = tokens.map(|t| t.parse::<u32>().unwrap()).collect::<Vec<u32>>();
 
 			match values[0] {
 				3 => {
-					let mut face = [values[1], values[2], values[3]];
+					let face = [values[1], values[2], values[3]];
 
 					let tangent = Vertex::calculate_tangent(
 						vertices[face[0] as usize].clone(),

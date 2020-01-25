@@ -4,8 +4,6 @@
 ///
 ///
 
-use cgmath;
-
 pub mod types {
 	pub type TFloat = f64;
 
@@ -20,13 +18,10 @@ pub mod consts {
 	pub const F_MAX: TFloat = ::std::f64::MAX;
 }
 
-
 pub mod prelude {
 
 	// We need to ex-export some of cgmath's traits to make certain operations
 	// usable without having to leak cgmath
+	pub use super::{consts::*, types::*};
 	pub use cgmath::{ElementWise, InnerSpace, MetricSpace};
-	pub use super::types::*;
-	pub use super::consts::*;
 }
-

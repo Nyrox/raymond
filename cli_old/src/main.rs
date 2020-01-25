@@ -2,20 +2,16 @@ extern crate cgmath;
 extern crate image;
 extern crate raytracer;
 
-use raytracer::{
-	trace::*,
-	transform::Transform,
-};
+use raytracer::{trace::*, transform::Transform};
 
 use core::{
-	scene::*,
 	geometry::{self, AccGrid, Mesh},
+	scene::*,
 };
 
-use core::{prelude::*};
+use core::prelude::*;
 
 use cgmath::Vector3;
-use std::cell::RefCell;
 
 use std::{
 	path::PathBuf,
@@ -28,9 +24,9 @@ use std::{
 
 use std::fs::File;
 
-static TRACE_COUNT: AtomicUsize = ATOMIC_USIZE_INIT;
-static SHADOW_RAY_COUNT: AtomicUsize = ATOMIC_USIZE_INIT;
-static SHADOW_TOTAL_TIME: AtomicUsize = ATOMIC_USIZE_INIT;
+static TRACE_COUNT: AtomicUsize = AtomicUsize::new(0);
+static SHADOW_RAY_COUNT: AtomicUsize = AtomicUsize::new(0);
+static SHADOW_TOTAL_TIME: AtomicUsize = AtomicUsize::new(0);
 
 fn main() {
 	let now = Instant::now();
@@ -43,13 +39,13 @@ fn main() {
 	)]);
 
 	let mut scene = Scene::new();
-	let mut sphere_mesh = Mesh::load_ply(PathBuf::from("assets/meshes/ico_sphere.ply"));
+	let _sphere_mesh = Mesh::load_ply(PathBuf::from("assets/meshes/ico_sphere.ply"));
 
 	scene.objects.push(Object {
 		geometry: Geometry::Sphere(geometry::Sphere {
-				origin: Vector3::new(-1.0, -0.5, 3.5),
-				radius: 0.5
-			}),
+			origin: Vector3::new(-1.0, -0.5, 3.5),
+			radius: 0.5,
+		}),
 
 		material: Material::Diffuse(Vector3::new(1.0, 0.00, 0.00), 0.02),
 	});
@@ -60,7 +56,7 @@ fn main() {
 	let mut cube_mesh = Mesh::load_ply(PathBuf::from("assets/meshes/dragon_vrip.ply"));
 	cube_mesh.bake_transform(Vector3::new(0.0, -0.3, 2.9));
 	// let mut cube_mesh = Arc::new(cube_mesh);
-	let mut cube_grid = AccGrid::build_from_mesh(cube_mesh);
+	let cube_grid = AccGrid::build_from_mesh(cube_mesh);
 	// let hit = cube_grid.intersects(&Ray { origin: Vector3::new(0.0, 0.0, 0.0), direction: Vector3::new(0.0, 0.0, 1.0) });
 	// println!("{:?}", hit);
 	// panic!();
@@ -86,8 +82,8 @@ fn main() {
 	// Ceiling
 	scene.objects.push(Object {
 		geometry: Geometry::Plane(geometry::Plane {
-		origin: Vector3::new(0.0, 2.0, 0.0),
-		normal: Vector3::new(0.0, -1.0, 0.0),
+			origin: Vector3::new(0.0, 2.0, 0.0),
+			normal: Vector3::new(0.0, -1.0, 0.0),
 		}),
 		material: Material::Emission(Vector3::new(1.5, 1.5, 1.5), Vector3::new(1.0, 1.0, 1.0), 0.27, 0.0),
 	});
@@ -95,33 +91,33 @@ fn main() {
 	// Frontwall
 	scene.objects.push(Object {
 		geometry: Geometry::Plane(geometry::Plane {
-		origin: Vector3::new(0.0, 0.0, -2.0),
-		normal: Vector3::new(0.0, 0.0, 1.0),
+			origin: Vector3::new(0.0, 0.0, -2.0),
+			normal: Vector3::new(0.0, 0.0, 1.0),
 		}),
 		material: Material::Diffuse(Vector3::new(1.0, 1.0, 1.0), 0.4),
 	});
 
 	// Backwall
-	scene.objects.push(Object  {
+	scene.objects.push(Object {
 		geometry: Geometry::Plane(geometry::Plane {
-		origin: Vector3::new(0.0, 0.0, 5.0),
-		normal: Vector3::new(0.0, 0.0, -1.0),
+			origin: Vector3::new(0.0, 0.0, 5.0),
+			normal: Vector3::new(0.0, 0.0, -1.0),
 		}),
 		material: Material::Diffuse(Vector3::new(0.0, 0.0, 0.0), 0.9),
 	});
 	// left wall
-	scene.objects.push(Object  {
+	scene.objects.push(Object {
 		geometry: Geometry::Plane(geometry::Plane {
-		origin: Vector3::new(-2.0, 0.0, 0.0),
-		normal: Vector3::new(1.0, 0.0, 0.0),
+			origin: Vector3::new(-2.0, 0.0, 0.0),
+			normal: Vector3::new(1.0, 0.0, 0.0),
 		}),
 		material: Material::Diffuse(Vector3::new(0.0, 0.0, 0.0), 0.3),
 	});
 	// right wall
-	scene.objects.push(Object  {
+	scene.objects.push(Object {
 		geometry: Geometry::Plane(geometry::Plane {
-		origin: Vector3::new(2.0, 0.0, 0.0),
-		normal: Vector3::new(-1.0, 0.0, 0.0),
+			origin: Vector3::new(2.0, 0.0, 0.0),
+			normal: Vector3::new(-1.0, 0.0, 0.0),
 		}),
 		material: Material::Diffuse(Vector3::new(0.0, 0.0, 0.0), 0.3),
 	});

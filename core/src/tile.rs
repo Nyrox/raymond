@@ -1,5 +1,5 @@
-use serde::{Serialize, Deserialize};
 use crate::math::prelude::*;
+use serde::{Deserialize, Serialize};
 
 use std::fmt;
 
