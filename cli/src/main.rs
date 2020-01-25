@@ -3,6 +3,13 @@ pub mod watch;
 use std::path::PathBuf;
 use structopt::StructOpt;
 
+use core::project;
+use core::geometry;
+use core::math::prelude::*;
+use core::Material;
+
+use raytracer::{transform::Transform, trace::{CameraSettingsBuilder, SettingsBuilder}};
+
 #[derive(StructOpt, Debug)]
 #[structopt(name = "raymond-cli")]
 enum RaymondCli {
@@ -18,9 +25,37 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 	let cli = RaymondCli::from_args();
 	println!("{:?}", cli);
 
+
+
+
 	match cli {
 		RaymondCli::Render { watch, scene } => {
 			println!("{:?}, {:?}", watch, scene);
+
+	let project = project::Project::load(scene)?;
+			let scene = project.build_scene();
+
+				let HEIGHT = 720;
+	let WIDTH = 1280;
+
+	let camera = CameraSettingsBuilder::default()
+		.backbuffer_width(WIDTH)
+		.backbuffer_height(HEIGHT)
+		.fov_vert(55.0)
+		.transform(Transform::identity())
+		.focal_length(2.5)
+		.aperture_radius(0.0)
+		.build()
+		.unwrap();
+
+	let settings = SettingsBuilder::default()
+		.camera_settings(camera)
+		.sample_count(25)
+		.tile_size((128, 128))
+		.bounce_limit(5)
+		.samples_per_iteration(3)
+		.build()
+		.unwrap();
 
 			let handle = raytracer::trace::render_tiled(scene, settings);
 
@@ -40,7 +75,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 							raytracer::trace::Message::TileProgressed(tile) => {
 								watcher.send_tile(tile);
 							},
-							_ => unimplemented!()
+							_ => ()
 						}
 					}
 				}

@@ -11,6 +11,8 @@ pub mod scene;
 pub mod tile;
 pub mod math;
 
+pub use tile::Tile;
+
 pub mod prelude {
 	pub use super::{
 		geometry::{

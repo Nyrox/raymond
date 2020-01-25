@@ -7,6 +7,7 @@ use crate::geometry::AccGrid;
 use std::sync::Arc;
 use std::path::{Path, PathBuf};
 use std::fs::File;
+use std::io::Write;
 
 use serde::{Serialize, Deserialize};
 
@@ -20,8 +21,8 @@ pub enum Geometry {
 
 #[derive(Serialize, Deserialize)]
 pub struct Object {
-	geometry: Geometry,
-	material: Material,
+	pub geometry: Geometry,
+	pub material: Material,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -30,6 +31,20 @@ pub struct Project {
 }
 
 impl Project {
+	pub fn new() -> Project {
+		Project {
+			objects: Vec::new(),
+		}
+	}
+
+	pub fn save(&self, p: impl AsRef<Path>) -> Result<(), Box<dyn std::error::Error>> {
+		let mut file = File::create(p)?;
+		let text = serde_json::to_string_pretty(&self)?;
+		file.write_all(text.as_bytes())?;
+
+		Ok(())
+	}
+
 	pub fn load(p: impl AsRef<Path>) -> Result<Project, Box<dyn std::error::Error>> {
 		let file = File::open(p)?;
 		Ok(serde_json::from_reader(file)?)

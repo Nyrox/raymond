@@ -25,13 +25,13 @@ impl WatcherHandle {
 		self.wants_to_close
 	}
 
-	pub fn send_tile(&self, tile: raytracer::Tile) {
+	pub fn send_tile(&self, tile: core::Tile) {
 		self.sender.send(ToWatcher::TileProgress(tile)).unwrap()
 	}
 }
 
 pub enum ToWatcher {
-	TileProgress(raytracer::Tile)
+	TileProgress(core::Tile)
 }
 
 pub enum FromWatcher {
@@ -43,7 +43,7 @@ pub fn start_watcher(width: usize, height: usize) -> Result<WatcherHandle, minif
 	let (in_sender, in_receiver) = mpsc::channel::<ToWatcher>();
 
 	thread::spawn(move || {
-		let mut buffer = vec![0; width * height];
+		let mut buffer: Vec<u32> = vec![0; width * height];
 
 		let mut window = Window::new("Raymond - Render In Progress", width, height, WindowOptions::default()).unwrap();
 
@@ -64,22 +64,37 @@ pub fn start_watcher(width: usize, height: usize) -> Result<WatcherHandle, minif
 							let x = tile.left + x;
 							let y = tile.top + y;
 
-							let ix = (data.x * 255.0) as u8;
-							let iy = (data.y * 255.0) as u8;
-							let iz = (data.z * 255.0) as u8;
+							let map = |p| {
+								let exposure = 1.0;
+								let gamma = 2.2;
 
-							let data = ix << 24 | iy << 16 | iz << 8 | 0xFF;
+								let p = p / (tile.sample_count as f64);
 
-							buffer[x + y * width] = data;
+								let tone_mapped = 1.0 - f64::exp(p * -1.0 * exposure);
+								let tone_mapped = tone_mapped.powf(1.0 / gamma);
+
+								(tone_mapped.min(1.0).max(0.0) * 255.0) as u32
+							};
+
+							let ix = map(data.x);
+							let iy = map(data.y);
+							let iz = map(data.z);
+							let data = ix << 16 | iy << 8 | iz << 0 | 0xFF << 24;
+
+							buffer[(x + y * width)] = data;
+
 						}
 					}
+					window.update_with_buffer(&buffer, width, height).unwrap();
 				}
 				Err(_) => (),
 				_ => unimplemented!(),
 			}
 
+
 			window.update();
 		}
+		println!("Window thread exited");
 	});
 
 	Ok(WatcherHandle {
