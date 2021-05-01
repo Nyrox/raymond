@@ -10,7 +10,7 @@ use std::{
 	time::Duration,
 };
 
-use crossbeam::queue::MsQueue;
+use crossbeam::queue::ArrayQueue;
 use rand;
 
 use num_cpus;
@@ -20,8 +20,7 @@ use super::{scene::*, transform::Transform};
 use core::{prelude::*, primitives::Plane};
 
 use super::PI;
-
-use log::*;
+use log::info;
 
 #[derive(Builder, Clone, Debug)]
 pub struct CameraSettings {
@@ -40,7 +39,7 @@ pub struct Settings {
 
 	pub camera_settings: CameraSettings,
 	pub sample_count: usize,
-	// The amount of samples per iteration
+ 	// The amount of samples per iteration
 	// If set to 0, the renderer will only notify the Receiver when a tile is fully rendered
 	#[builder(default = "0")]
 	pub samples_per_iteration: usize,
@@ -125,7 +124,10 @@ impl TaskHandle {
 }
 
 pub fn render_tiled(scene: Scene, settings: Settings) -> TaskHandle {
-	let queue = Arc::new(MsQueue::new());
+	let queue = Arc::new(ArrayQueue::new(
+		((settings.camera_settings.backbuffer_width as f32 / settings.tile_size.0 as f32).ceil() *
+		(settings.camera_settings.backbuffer_height as f32 / settings.tile_size.1 as f32).ceil()) as usize,
+	));
 	let (sender, receiver) = mpsc::channel();
 
 	// Split the backbuffer into tiles and push them into the queue
@@ -176,7 +178,7 @@ pub fn render_tiled(scene: Scene, settings: Settings) -> TaskHandle {
 
 		let thread_count = thread_count.clone();
 		thread::spawn(move || loop {
-			let mut tile = match queue.try_pop() {
+			let mut tile = match queue.pop() {
 				Some(t) => t,
 				None => {
 					thread_count.fetch_sub(1, Ordering::Relaxed);

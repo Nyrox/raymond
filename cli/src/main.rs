@@ -1,6 +1,3 @@
-extern crate cgmath;
-extern crate image;
-extern crate raytracer;
 
 use raytracer::{
 	acc_grid,
@@ -12,7 +9,6 @@ use raytracer::{
 
 use core::{prelude::*, primitives::*};
 
-use cgmath::Vector3;
 use std::cell::RefCell;
 
 use std::{
@@ -131,15 +127,15 @@ fn main() {
 
 	let final_image = render;
 
-	fn element_wise_map<Fun: Fn(f64) -> f64>(vec: &Vector3<f64>, f: Fun) -> Vector3<f64> {
-		Vector3::new(f(vec.x), f(vec.y), f(vec.z))
+	fn element_wise_map<Fun: Fn(f64) -> f64>(vec: &cgmath::Vector3<f64>, f: Fun) -> cgmath::Vector3<f64> {
+		cgmath::Vector3::new(f(vec.x), f(vec.y), f(vec.z))
 	}
 
-	let mut export = vec![Vector3::new(0, 0, 0); WIDTH * HEIGHT];
+	let mut export = vec![cgmath::Vector3::new(0, 0, 0); WIDTH * HEIGHT];
 	for (i, p) in final_image.iter().enumerate() {
 		let exposure = 1.0;
 		let gamma = 2.2;
-		let tone_mapped = Vector3::new(1.0, 1.0, 1.0) - element_wise_map(&(p * -1.0 * exposure), |e| f64::exp(e));
+		let tone_mapped =cgmath:: Vector3::new(1.0, 1.0, 1.0) - element_wise_map(&(p * -1.0 * exposure), |e| f64::exp(e));
 		let tone_mapped = element_wise_map(&tone_mapped, |x| x.powf(1.0 / gamma));
 
 		for i in 0..3 {
