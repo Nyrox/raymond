@@ -22,6 +22,8 @@ enum RaymondCli {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+	core::do_magic();
+	
 	let cli = RaymondCli::from_args();
 	println!("{:?}", cli);
 

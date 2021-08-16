@@ -1,16 +1,15 @@
 use std::{
-	default::Default,
-	f64, marker,
+	f64,
 	sync::{
 		atomic::{AtomicUsize, Ordering},
-		mpsc::{self, Receiver, Sender, TryRecvError},
-		Arc, RwLock,
+		mpsc::{self},
+		Arc
 	},
 	thread,
 	time::Duration,
 };
 
-use crossbeam::queue::MsQueue;
+use crossbeam::queue::ArrayQueue;
 use rand;
 
 use num_cpus;
@@ -129,7 +128,7 @@ impl TaskHandle {
 }
 
 pub fn render_tiled(scene: Scene, settings: Settings) -> TaskHandle {
-	let queue = Arc::new(MsQueue::new());
+	let mut initial_tiles = Vec::new();
 	let (sender, receiver) = mpsc::channel();
 
 	// Split the backbuffer into tiles and push them into the queue
@@ -146,7 +145,7 @@ pub fn render_tiled(scene: Scene, settings: Settings) -> TaskHandle {
 			let width = tile_max.0 - tile_min.0;
 			let height = tile_max.1 - tile_min.1;
 
-			queue.push(Tile {
+			initial_tiles.push(Tile {
 				sample_count: 0,
 				left: tile_min.0,
 				top: tile_min.1,
@@ -166,6 +165,10 @@ pub fn render_tiled(scene: Scene, settings: Settings) -> TaskHandle {
 		}
 	}
 
+	let queue = Arc::new(ArrayQueue::new(initial_tiles.len()));
+	for t in initial_tiles { queue.push(t).unwrap(); }
+	
+
 	let thread_count = Arc::new(AtomicUsize::new(settings.worker_count));
 	for _ in 0..settings.worker_count {
 		let queue = queue.clone();
@@ -180,7 +183,7 @@ pub fn render_tiled(scene: Scene, settings: Settings) -> TaskHandle {
 
 		let thread_count = thread_count.clone();
 		thread::spawn(move || loop {
-			let mut tile = match queue.try_pop() {
+			let mut tile = match queue.pop() {
 				Some(t) => t,
 				None => {
 					thread_count.fetch_sub(1, Ordering::Relaxed);
