@@ -15,7 +15,8 @@ serde="1"
 serde_derive="1"
 serde_json="1"
 log="0.4.8"
-bbox_intersect={ path="./bbox_intersect" }
+bbox_intersect={ path="./bbox_intersect", default-features=false, features=["opencl"] }
+
 [build-dependencies]
-genfut={ git="https://github.com/pema99/genfut", feature=["opencl"] }
+genfut={ path="../../../../genfut", default-features=false, features=["opencl"] }
 

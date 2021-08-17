@@ -53,6 +53,7 @@ impl Scene {
 		let mut closest_distance = F_MAX;
 		let mut closest_object = None;
 
+		
 		for (i, object) in self.objects.iter().enumerate() {
 			match object.geometry.intersects(ray) {
 				Some(hit) => {

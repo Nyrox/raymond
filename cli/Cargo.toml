@@ -8,6 +8,6 @@ edition = "2018"
 
 [dependencies]
 structopt="0.3"
-minifb="0.15.3"
+minifb="0.19.3"
 core = {path="../core"}
 raytracer = {path="../"}

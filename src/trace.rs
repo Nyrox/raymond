@@ -9,7 +9,7 @@ use std::{
 	time::Duration,
 };
 
-use crossbeam::queue::ArrayQueue;
+use crossbeam::{queue::ArrayQueue};
 use rand;
 
 use num_cpus;
@@ -54,6 +54,7 @@ struct TraceContext {
 
 #[derive(Clone, Debug)]
 pub enum Message {
+	Finished,
 	TileFinished(Tile),
 	TileProgressed(Tile),
 }
@@ -186,7 +187,9 @@ pub fn render_tiled(scene: Scene, settings: Settings) -> TaskHandle {
 			let mut tile = match queue.pop() {
 				Some(t) => t,
 				None => {
-					thread_count.fetch_sub(1, Ordering::Relaxed);
+					if 1 == thread_count.fetch_sub(1, Ordering::Relaxed) {
+						sender.send(Message::Finished);
+					}
 					return;
 				}
 			};
