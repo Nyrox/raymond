@@ -16,7 +16,7 @@ use num_cpus;
 
 use super::transform::Transform;
 
-use core::{geometry::*, prelude::*, scene::Scene, tile::Tile};
+use raymond_core::{geometry::*, prelude::*, scene::Scene, tile::Tile};
 
 use super::PI;
 
