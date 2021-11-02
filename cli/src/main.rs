@@ -3,9 +3,9 @@ pub mod watch;
 use std::{path::PathBuf, time::Instant};
 use structopt::StructOpt;
 
-use core::project;
+use raymond_core::project;
 
-use raytracer::{
+use raymond::{
 	trace::{CameraSettingsBuilder, SettingsBuilder},
 	transform::Transform,
 };
@@ -22,8 +22,7 @@ enum RaymondCli {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-	core::do_magic();
-	
+
 	let cli = RaymondCli::from_args();
 	println!("{:?}", cli);
 

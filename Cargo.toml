@@ -1,5 +1,5 @@
 [package]
-name = "raytracer"
+name = "raymond"
 version = "0.1.0"
 authors = ["Nyrox <root@nyrox.tech>"]
 edition="2018"
@@ -20,14 +20,12 @@ derive_builder="*"
 simplelog="*"
 log="*"
 
-core={path="./core"}
+raymond-core={path="./raymond-core"}
 
 [workspace]
 members=[
 	"cli",
-	"core",
-	"cli_old",
-	"core/bbox_intersect",
+	"raymond-core",
 ]
 exclude=[
 	"editor\\frontend"
