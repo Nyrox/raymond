@@ -1,5 +1,5 @@
 [package]
-name = "core"
+name = "raymond-core"
 version = "0.1.0"
 authors = ["Mark Junge <mark.oliver@hotmail.de>"]
 edition = "2018"
@@ -15,8 +15,3 @@ serde="1"
 serde_derive="1"
 serde_json="1"
 log="0.4.8"
-bbox_intersect={ path="./bbox_intersect", default-features=false, features=["opencl"] }
-
-[build-dependencies]
-genfut={ path="../../../../genfut", default-features=false, features=["opencl"] }
-
