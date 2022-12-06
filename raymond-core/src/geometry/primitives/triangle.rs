@@ -9,7 +9,7 @@ pub struct Triangle(pub Vertex, pub Vertex, pub Vertex);
 
 impl Intersect for Triangle {
 	fn intersects(&self, ray: Ray) -> Option<Hit> {
-		const EPSILON: f64 = 0.00000001;
+		const EPSILON: f32 = 0.00000001;
 
 		let (vertex0, vertex1, vertex2) = (self.0.position, self.1.position, self.2.position);
 
@@ -45,7 +45,7 @@ impl Intersect for Triangle {
 }
 impl Triangle {
 	pub fn get_surface_properties(&self, hit: Hit) -> SurfaceProperties {
-		fn area(a: Vector3, b: Vector3, c: Vector3) -> f64 {
+		fn area(a: Vector3, b: Vector3, c: Vector3) -> f32 {
 			let ab = a.distance(b);
 			let ac = a.distance(c);
 			let bc = b.distance(c);

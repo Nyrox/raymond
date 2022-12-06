@@ -1,9 +1,4 @@
-use crate::{
-	geometry::{AccGrid, Mesh, Plane, Sphere},
-	scene,
-	scene::Scene,
-	Material,
-};
+use crate::{Material, Vector3, geometry::{AccGrid, Mesh, Plane, Sphere}, scene, scene::Scene};
 
 use std::{
 	fs::File,
@@ -18,7 +13,7 @@ use serde::{Deserialize, Serialize};
 pub enum Geometry {
 	Plane(Plane),
 	Sphere(Sphere),
-	Mesh(PathBuf),
+	Mesh(PathBuf, Vector3),
 }
 
 #[derive(Serialize, Deserialize)]
@@ -58,7 +53,11 @@ impl Project {
 				geometry: match obj.geometry {
 					Geometry::Plane(p) => scene::Geometry::Plane(p),
 					Geometry::Sphere(s) => scene::Geometry::Sphere(s),
-					Geometry::Mesh(m) => scene::Geometry::Grid(Arc::new(AccGrid::build_from_mesh(Mesh::load_ply(m)))),
+					Geometry::Mesh(m, t) => {
+						let mut mesh = Mesh::load_ply(m);
+						mesh.bake_transform(t);
+						scene::Geometry::Grid(Arc::new(AccGrid::build_from_mesh(mesh)))
+					},
 				},
 				material: obj.material,
 			});

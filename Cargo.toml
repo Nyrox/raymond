@@ -5,7 +5,7 @@ authors = ["Nyrox <root@nyrox.tech>"]
 edition="2018"
 
 [dependencies]
-cgmath={version="0.17", features=["serde"]}
+cgmath={version="0.18", features=["serde"]}
 image="*"
 num-traits="*"
 rand="0.6"
@@ -19,7 +19,6 @@ futures="*"
 derive_builder="*"
 simplelog="*"
 log="*"
-
 raymond-core={path="./raymond-core"}
 
 [workspace]

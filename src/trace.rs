@@ -1,15 +1,15 @@
 use std::{
-	f64,
+	f32,
 	sync::{
 		atomic::{AtomicUsize, Ordering},
 		mpsc::{self},
-		Arc
+		Arc,
 	},
 	thread,
 	time::Duration,
 };
 
-use crossbeam::{queue::ArrayQueue};
+use crossbeam::queue::ArrayQueue;
 use rand;
 
 use num_cpus;
@@ -26,10 +26,10 @@ use log::*;
 pub struct CameraSettings {
 	pub backbuffer_width: usize,
 	pub backbuffer_height: usize,
-	pub fov_vert: f64,
+	pub fov_vert: f32,
 	pub transform: Transform,
-	pub focal_length: f64,
-	pub aperture_radius: f64,
+	pub focal_length: f32,
+	pub aperture_radius: f32,
 }
 
 #[derive(Builder, Clone, Debug)]
@@ -86,7 +86,7 @@ impl TaskHandle {
 						Ok(Message::TileFinished(tile)) => {
 							for y in 0..tile.height {
 								for x in 0..tile.width {
-									let s = tile.data[x + y * tile.width] / tile.sample_count as f64;
+									let s = tile.data[x + y * tile.width] / tile.sample_count as f32;
 
 									out[x + tile.left + (y + tile.top) * self.settings.camera_settings.backbuffer_width] = s;
 								}
@@ -167,8 +167,9 @@ pub fn render_tiled(scene: Scene, settings: Settings) -> TaskHandle {
 	}
 
 	let queue = Arc::new(ArrayQueue::new(initial_tiles.len()));
-	for t in initial_tiles { queue.push(t).unwrap(); }
-	
+	for t in initial_tiles {
+		queue.push(t).unwrap();
+	}
 
 	let thread_count = Arc::new(AtomicUsize::new(settings.worker_count));
 	for _ in 0..settings.worker_count {
@@ -257,7 +258,7 @@ fn trace(ray: Ray, context: &TraceContext, depth: usize) -> Vector3 {
 	let f0 = Vector3::new(0.04, 0.04, 0.04);
 	let f0 = lerp_vec(f0, material_color, material_metalness);
 	// Decide whether to sample diffuse or specular
-	let r = rand::random::<f64>();
+	let r = rand::random::<f32>();
 	let local_cartesian = create_coordinate_system_of_n(normal);
 	let local_cartesian_transform = cgmath::Matrix3::from_cols(local_cartesian.0, normal, local_cartesian.1);
 	let prob_d = lerp(0.5, 0.0, material_metalness);
@@ -279,13 +280,13 @@ fn trace(ray: Ray, context: &TraceContext, depth: usize) -> Vector3 {
 		let mut diffuse_part = Vector3::new(1.0, 1.0, 1.0) - specular_part;
 		diffuse_part *= 1.0 - material_metalness;
 		let output = (diffuse_part.mul_element_wise(material_color)).mul_element_wise(radiance) * cos_theta;
-		return output / (prob_d * pdf);
+		return prob_d * output / pdf;
 	} else {
 		// Sample specular
 		let reflect = (-view_dir - 2.0 * (-view_dir.dot(normal) * normal)).normalize();
-		fn importance_sample_ggx(reflect: Vector3, roughness: f64) -> Vector3 {
-			let r1: f64 = rand::random();
-			let r2: f64 = rand::random();
+		fn importance_sample_ggx(reflect: Vector3, roughness: f32) -> Vector3 {
+			let r1: f32 = rand::random();
+			let r2: f32 = rand::random();
 			let a = roughness * roughness;
 			let phi = 2.0 * PI * r1;
 			let theta = a * (r2 / (1.0 - r2)).sqrt();
@@ -315,19 +316,19 @@ fn trace(ray: Ray, context: &TraceContext, depth: usize) -> Vector3 {
 		let output = (specular).mul_element_wise(radiance) * cos_theta;
 		// pdf
 		let pdf = { (D * normal.dot(halfway)) / (4.0 * halfway.dot(view_dir)) + 0.0001 };
-		return output / (1.0 - prob_d) / pdf;
+		return (1.0 - prob_d) * output / pdf;
 	}
 }
 
 fn generate_primary_ray(x: usize, y: usize, camera: &CameraSettings) -> Ray {
-	let width = camera.backbuffer_width as f64;
-	let height = camera.backbuffer_height as f64;
+	let width = camera.backbuffer_width as f32;
+	let height = camera.backbuffer_height as f32;
 	let aspect = width / height;
-	let x = x as f64 + (rand::random::<f64>() - 0.5);
-	let y = y as f64 + (rand::random::<f64>() - 0.5);
+	let x = x as f32 + (rand::random::<f32>() - 0.5);
+	let y = y as f32 + (rand::random::<f32>() - 0.5);
 
-	let px = (2.0 * ((x + 0.5) / width) - 1.0) * f64::tan(camera.fov_vert / 2.0 * PI / 180.0) * aspect;
-	let py = (1.0 - 2.0 * ((y + 0.5) / height)) * f64::tan(camera.fov_vert / 2.0 * PI / 180.0);
+	let px = (2.0 * ((x + 0.5) / width) - 1.0) * f32::tan(camera.fov_vert / 2.0 * PI / 180.0) * aspect;
+	let py = (1.0 - 2.0 * ((y + 0.5) / height)) * f32::tan(camera.fov_vert / 2.0 * PI / 180.0);
 
 	Ray::new(camera.transform.position, Vector3::new(px, py, 1.0).normalize())
 }
@@ -337,8 +338,8 @@ fn generate_primary_ray_with_dof(x: usize, y: usize, camera: &CameraSettings) ->
 
 	// chose random point on the aperture, through rejection sampling
 	let start = loop {
-		let r1 = rand::random::<f64>() * 2.0 - 1.0;
-		let r2 = rand::random::<f64>() * 2.0 - 1.0;
+		let r1 = rand::random::<f32>() * 2.0 - 1.0;
+		let r2 = rand::random::<f32>() * 2.0 - 1.0;
 		let ax = camera.transform.position.x + r1 * camera.aperture_radius;
 		let ay = camera.transform.position.y + r2 * camera.aperture_radius;
 		let _start = Vector3::new(ax, ay, camera.transform.position.z);
@@ -359,7 +360,7 @@ fn generate_primary_ray_with_dof(x: usize, y: usize, camera: &CameraSettings) ->
 	};
 }
 
-fn ggx_distribution(n: Vector3, h: Vector3, roughness: f64) -> f64 {
+fn ggx_distribution(n: Vector3, h: Vector3, roughness: f32) -> f32 {
 	let a2 = roughness * roughness;
 	let NdotH = n.dot(h);
 
@@ -369,7 +370,7 @@ fn ggx_distribution(n: Vector3, h: Vector3, roughness: f64) -> f64 {
 	return nominator / denominator;
 }
 
-fn geometry_schlick_ggx(n: Vector3, v: Vector3, r: f64) -> f64 {
+fn geometry_schlick_ggx(n: Vector3, v: Vector3, r: f32) -> f32 {
 	let numerator = n.dot(v).max(0.0);
 	let k = (r * r) / 8.0;
 	let denominator = numerator * (1.0 - k) + k;
@@ -377,25 +378,25 @@ fn geometry_schlick_ggx(n: Vector3, v: Vector3, r: f64) -> f64 {
 	return numerator / denominator;
 }
 
-fn geometry_smith(n: Vector3, v: Vector3, l: Vector3, r: f64) -> f64 {
+fn geometry_smith(n: Vector3, v: Vector3, l: Vector3, r: f32) -> f32 {
 	return geometry_schlick_ggx(n, v, r) * geometry_schlick_ggx(n, l, r);
 }
 
-fn fresnel_schlick(cos_theta: f64, F0: Vector3) -> Vector3 {
+fn fresnel_schlick(cos_theta: f32, F0: Vector3) -> Vector3 {
 	return F0 + (Vector3::new(1.0, 1.0, 1.0) - F0) * (1.0 - cos_theta).powf(5.0);
 }
 
-fn lerp_vec(min: Vector3, max: Vector3, a: f64) -> Vector3 {
+fn lerp_vec(min: Vector3, max: Vector3, a: f32) -> Vector3 {
 	Vector3::new(lerp(min.x, max.x, a), lerp(min.y, max.y, a), lerp(min.z, max.z, a))
 }
 
-fn lerp(min: f64, max: f64, a: f64) -> f64 {
+fn lerp(min: f32, max: f32, a: f32) -> f32 {
 	min + a * (max - min)
 }
 
-fn uniform_sample_hemisphere() -> (Vector3, f64) {
-	let r1 = rand::random::<f64>();
-	let r2 = rand::random::<f64>();
+fn uniform_sample_hemisphere() -> (Vector3, f32) {
+	let r1 = rand::random::<f32>();
+	let r2 = rand::random::<f32>();
 
 	let theta = (r1.sqrt()).acos();
 	let phi = 2.0 * PI * r2;
