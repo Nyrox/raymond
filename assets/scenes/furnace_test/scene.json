@@ -1,0 +1,23 @@
+{
+    "objects": [{
+        "geometry": {
+            "Sphere": {
+                "origin": {
+                    "x": 0,
+                    "y": 0,
+                    "z": 0
+                },
+                "radius": 1
+            }
+        },
+        "material": {
+            "Diffuse": [{
+                    "x": 0.18,
+                    "y": 0.18,
+                    "z": 0.18
+                },
+                1.0
+            ]
+        }
+    }]
+}

@@ -3,7 +3,7 @@ pub mod watch;
 use std::{path::PathBuf, time::Instant};
 use structopt::StructOpt;
 
-use raymond_core::project;
+use raymond_core::{project, Vector3};
 
 use raymond::{
 	trace::{CameraSettingsBuilder, SettingsBuilder},
@@ -29,7 +29,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 		RaymondCli::Render { watch, scene } => {
 			println!("{:?}, {:?}", watch, scene);
 
-			let project = project::Project::load(scene)?;
+			let project = project::Project::load_from_file(scene)?;
 			let scene = project.build_scene();
 
 			let HEIGHT = 720;
@@ -39,7 +39,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 				.backbuffer_width(WIDTH)
 				.backbuffer_height(HEIGHT)
 				.fov_vert(55.0)
-				.transform(Transform::identity())
+				.transform(Transform { position: Vector3::new(0.0, 0.5, -1.0) })
 				.focal_length(2.5)
 				.aperture_radius(0.0)
 				.build()

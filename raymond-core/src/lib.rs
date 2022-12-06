@@ -10,6 +10,7 @@ pub mod math;
 pub mod project;
 pub mod scene;
 pub mod tile;
+pub mod trace;
 
 pub use tile::Tile;
 

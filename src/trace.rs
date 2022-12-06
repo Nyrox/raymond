@@ -61,12 +61,15 @@ pub enum Message {
 
 pub type TileCallback = Box<dyn Fn(Tile) -> ()>;
 
+
 pub struct TaskHandle {
 	pub receiver: mpsc::Receiver<Message>,
 	pub settings: Settings,
 	callback: Option<TileCallback>,
 	alive_thread_count: Arc<AtomicUsize>,
 }
+
+
 
 impl TaskHandle {
 	pub fn set_callback(&mut self, callback: Option<TileCallback>) {
@@ -240,7 +243,7 @@ fn trace(ray: Ray, context: &TraceContext, depth: usize) -> Vector3 {
 	let intersect = context.scene.intersect(ray);
 	let (object, hit) = match intersect {
 		Some((o, h)) => (o, h),
-		None => return Vector3::new(0.0, 0.0, 0.0),
+		None => return Vector3::new(1.0, 1.0, 1.0),
 	};
 	let surface_properties = object.geometry.get_surface_properties(hit);
 	let normal = surface_properties.normal;

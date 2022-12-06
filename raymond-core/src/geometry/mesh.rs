@@ -54,9 +54,7 @@ impl Mesh {
 		self.bounding_box = Self::find_mesh_bounds(&self.triangles);
 	}
 
-	pub fn load_ply(path: PathBuf) -> Mesh {
-		let buffer = fs::read_to_string(path).unwrap();
-
+	pub fn load_ply(buffer: &str) -> Mesh {
 		let mut vertices = Vec::<Vertex>::new();
 		let mut faces = Vec::<Triangle>::new();
 		let mut lines = buffer.lines();

@@ -41,8 +41,6 @@ impl AccGrid {
 	pub fn build_from_mesh(mesh: Mesh) -> AccGrid {
 		let grid_res = estimate_grid_resolution(&mesh.bounding_box, mesh.triangles.len());
 
-		dbg!(grid_res);
-
 		let cell_size = (mesh.bounding_box.max - mesh.bounding_box.min).div_element_wise(grid_res.cast::<f32>().unwrap());
 		let mut naive_cells = vec![NaiveCell(Vec::new()); grid_res.x * grid_res.y * grid_res.z];
 		let mut mapping_table: Vec<usize> = Vec::new();

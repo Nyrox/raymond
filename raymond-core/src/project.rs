@@ -40,9 +40,13 @@ impl Project {
 		Ok(())
 	}
 
-	pub fn load(p: impl AsRef<Path>) -> Result<Project, Box<dyn std::error::Error>> {
+	pub fn load_from_file(p: impl AsRef<Path>) -> Result<Project, Box<dyn std::error::Error>> {
 		let file = File::open(p)?;
 		Ok(serde_json::from_reader(file)?)
+	}
+
+	pub fn parse(p: &str) -> Result<Project, Box<dyn std::error::Error>> {
+		Ok(serde_json::from_str(p)?)
 	}
 
 	pub fn build_scene(self) -> Scene {
@@ -54,7 +58,7 @@ impl Project {
 					Geometry::Plane(p) => scene::Geometry::Plane(p),
 					Geometry::Sphere(s) => scene::Geometry::Sphere(s),
 					Geometry::Mesh(m, t) => {
-						let mut mesh = Mesh::load_ply(m);
+						let mut mesh = Mesh::load_ply(&std::fs::read_to_string(m).unwrap());
 						mesh.bake_transform(t);
 						scene::Geometry::Grid(Arc::new(AccGrid::build_from_mesh(mesh)))
 					},

@@ -19,6 +19,8 @@ impl Intersect for Sphere {
 		}
 
 		t -= (self.radius * self.radius - p).sqrt();
+
+		// Backface Culling
 		if t <= 0.0 {
 			return None;
 		}
