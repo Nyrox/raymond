@@ -22,6 +22,24 @@
 		},
 		{
 			"geometry": {
+				"Mesh": ["assets/meshes/dragon_vrip.ply", {
+					"x": 0.0,
+					"y": 0.0,
+					"z": 3.0
+				}]
+			},
+			"material": {
+				"Diffuse": [{
+						"x": 0.4,
+						"y": 0.6,
+						"z": 0.2
+					},
+					0.94
+				]
+			}
+		},
+		{
+			"geometry": {
 				"Plane": {
 					"origin": {
 						"x": 0.0,
@@ -62,9 +80,9 @@
 			},
 			"material": {
 				"Emission": [{
-						"x": 1.5,
-						"y": 1.5,
-						"z": 1.5
+						"x": 5.0,
+						"y": 5.0,
+						"z": 5.0
 					},
 					{
 						"x": 1.0,

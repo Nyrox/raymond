@@ -2,8 +2,8 @@
 
 use serde::{Deserialize, Serialize};
 
-pub type Vector3 = cgmath::Vector3<f64>;
-pub type Vector2 = cgmath::Vector2<f64>;
+pub type Vector3 = cgmath::Vector3<f32>;
+pub type Vector2 = cgmath::Vector2<f32>;
 
 pub mod geometry;
 pub mod math;
@@ -23,8 +23,7 @@ pub mod prelude {
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum Material {
-	Diffuse(Vector3, f64),
-	Metal(Vector3, f64),
-	Emission(Vector3, Vector3, f64, f64),
+	Diffuse(Vector3, f32),
+	Metal(Vector3, f32),
+	Emission(Vector3, Vector3, f32, f32),
 }
-

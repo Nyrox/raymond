@@ -11,13 +11,13 @@ pub struct SurfaceProperties {
 
 #[derive(Clone, Copy, Debug)]
 pub struct Hit {
-	pub distance: f64,
+	pub distance: f32,
 	pub ray: Ray,
 	pub subobject_index: usize,
 }
 
 impl Hit {
-	pub fn new(ray: Ray, distance: f64) -> Hit {
+	pub fn new(ray: Ray, distance: f32) -> Hit {
 		Hit {
 			ray,
 			distance,
@@ -25,7 +25,7 @@ impl Hit {
 		}
 	}
 
-	pub fn with_child(ray: Ray, distance: f64, subobject_index: usize) -> Hit {
+	pub fn with_child(ray: Ray, distance: f32, subobject_index: usize) -> Hit {
 		Hit {
 			ray,
 			distance,

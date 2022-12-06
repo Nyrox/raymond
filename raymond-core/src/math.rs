@@ -5,7 +5,7 @@
 ///
 
 pub mod types {
-	pub type TFloat = f64;
+	pub type TFloat = f32;
 
 	pub type Vector2 = cgmath::Vector2<TFloat>;
 	pub type Vector3 = cgmath::Vector3<TFloat>;
@@ -14,8 +14,8 @@ pub mod types {
 pub mod consts {
 	use super::types::*;
 
-	pub const PI: TFloat = ::std::f64::consts::PI;
-	pub const F_MAX: TFloat = ::std::f64::MAX;
+	pub const PI: TFloat = ::std::f32::consts::PI;
+	pub const F_MAX: TFloat = ::std::f32::MAX;
 }
 
 pub mod prelude {

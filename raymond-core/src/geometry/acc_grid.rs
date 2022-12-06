@@ -3,18 +3,21 @@ use crate::{
 	math::prelude::*,
 };
 
-const GRID_DENSITY_BIAS: f64 = 3.0;
+const GRID_DENSITY_BIAS: f32 = 3.0;
 
 fn estimate_grid_resolution(bounds: &AABB, triangle_count: usize) -> cgmath::Vector3<usize> {
+	if triangle_count < 10 {
+		return cgmath::Vector3::new(1, 1, 1);
+	}
 	let size = bounds.max - bounds.min;
 	let volume = (size.x * size.y * size.z).abs();
 
-	let triangle_density = ((GRID_DENSITY_BIAS * triangle_count as f64) / volume).powf(1.0 / 3.0);
+	let triangle_density = ((GRID_DENSITY_BIAS * triangle_count as f32) / volume).powf(1.0 / 3.0);
 
 	return cgmath::Vector3::new(
-		(size.x.abs() * triangle_density) as usize,
-		(size.y.abs() * triangle_density) as usize,
-		(size.z.abs() * triangle_density) as usize,
+		(size.x.abs() * triangle_density).max(1.0) as usize,
+		(size.y.abs() * triangle_density).max(1.0) as usize,
+		(size.z.abs() * triangle_density).max(1.0) as usize,
 	);
 }
 
@@ -37,12 +40,16 @@ pub struct AccGrid {
 impl AccGrid {
 	pub fn build_from_mesh(mesh: Mesh) -> AccGrid {
 		let grid_res = estimate_grid_resolution(&mesh.bounding_box, mesh.triangles.len());
-		let cell_size = (mesh.bounding_box.max - mesh.bounding_box.min).div_element_wise(grid_res.cast::<f64>().unwrap());
+
+		dbg!(grid_res);
+
+		let cell_size = (mesh.bounding_box.max - mesh.bounding_box.min).div_element_wise(grid_res.cast::<f32>().unwrap());
 		let mut naive_cells = vec![NaiveCell(Vec::new()); grid_res.x * grid_res.y * grid_res.z];
 		let mut mapping_table: Vec<usize> = Vec::new();
 
 		for (index, tri) in mesh.triangles.iter().enumerate() {
 			let bounds = tri.find_bounds();
+
 			let mut cell_min = (bounds.min - mesh.bounding_box.min)
 				.div_element_wise(cell_size)
 				.cast::<usize>()
@@ -55,12 +62,19 @@ impl AccGrid {
 			for i in 0..3 {
 				cell_min[i] = cell_min[i].max(0).min(grid_res[i] - 1);
 				cell_max[i] = cell_max[i].max(0).min(grid_res[i] - 1);
+
+				assert!(cell_min[i] <= cell_max[i]);
 			}
+
 
 			for z in cell_min.z..=cell_max.z {
 				for y in cell_min.y..=cell_max.y {
 					for x in cell_min.x..=cell_max.x {
-						naive_cells[x + grid_res.x * (y + z * grid_res.z)].0.push(index);
+						assert!(x < grid_res.x);
+						assert!(y < grid_res.y);
+						assert!(z < grid_res.z);
+
+						naive_cells[x + grid_res.x * (z + y * grid_res.z)].0.push(index);
 					}
 				}
 			}
@@ -120,19 +134,19 @@ impl AccGrid {
 		} / ray.direction.z;
 
 		let mut t_max_x =
-			(((current_cell.x + if ray.direction.x < 0.0 { 0 } else { 1 }) as f64 * self.cell_size.x) - start.x) / ray.direction.x;
+			(((current_cell.x + if ray.direction.x < 0.0 { 0 } else { 1 }) as f32 * self.cell_size.x) - start.x) / ray.direction.x;
 		let mut t_max_y =
-			(((current_cell.y + if ray.direction.y < 0.0 { 0 } else { 1 }) as f64 * self.cell_size.y) - start.y) / ray.direction.y;
+			(((current_cell.y + if ray.direction.y < 0.0 { 0 } else { 1 }) as f32 * self.cell_size.y) - start.y) / ray.direction.y;
 		let mut t_max_z =
-			(((current_cell.z + if ray.direction.z < 0.0 { 0 } else { 1 }) as f64 * self.cell_size.z) - start.z) / ray.direction.z;
+			(((current_cell.z + if ray.direction.z < 0.0 { 0 } else { 1 }) as f32 * self.cell_size.z) - start.z) / ray.direction.z;
 
 		loop {
 			let (x, y, z) = (current_cell.x as usize, current_cell.y as usize, current_cell.z as usize);
-			if x + self.resolution.x * (y + z * self.resolution.z) >= self.cells.len() {
+			if x + self.resolution.x * (z + y * self.resolution.z) >= self.cells.len() {
 				return None;
 			}
 
-			let cell = self.cells[x + self.resolution.x * (y + z * self.resolution.z)];
+			let cell = self.cells[x + self.resolution.x * (z + y * self.resolution.z)];
 			let count = self.mapping_table[cell.0];
 			let mut closest = 5712515.0;
 			let mut closest_hit = None;

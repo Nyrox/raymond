@@ -22,7 +22,6 @@ enum RaymondCli {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-
 	let cli = RaymondCli::from_args();
 	println!("{:?}", cli);
 
@@ -48,15 +47,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 			let settings = SettingsBuilder::default()
 				.camera_settings(camera)
-				.sample_count(5)
-				.tile_size((128, 128))
+				.sample_count(250)
+				.tile_size((512, 512))
 				.bounce_limit(5)
-				.samples_per_iteration(3)
+				.samples_per_iteration(5)
 				.build()
 				.unwrap();
 
 			let start_time = Instant::now();
-			let handle = raytracer::trace::render_tiled(scene, settings);
+			let handle = raymond::trace::render_tiled(scene, settings);
 
 			if watch {
 				let mut watcher = watch::start(1280, 720)?;
@@ -66,11 +65,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 					while let Some(tile) = handle.poll() {
 						match tile {
-							raytracer::trace::Message::TileProgressed(tile) => {
+							raymond::trace::Message::TileProgressed(tile) => {
 								watcher.progress_tile(tile);
-							},
-							raytracer::trace::Message::Finished => {
-								println!("Render finished in: {} seconds", start_time.elapsed().as_secs_f64())
+							}
+							raymond::trace::Message::Finished => {
+								println!("Render finished in: {} seconds", start_time.elapsed().as_secs_f32())
 							}
 							_ => (),
 						}

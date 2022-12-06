@@ -79,7 +79,7 @@ impl Mesh {
 		for _ in 0..vertices.capacity() {
 			let line = lines.next().unwrap();
 			let tokens = line.split_whitespace();
-			let values = tokens.map(|t| t.parse::<f64>().unwrap()).collect::<Vec<f64>>();
+			let values = tokens.map(|t| t.parse::<f32>().unwrap()).collect::<Vec<f32>>();
 			vertices.push(Vertex {
 				position: Vector3::new(values[0], values[1], values[2]),
 				normal: Vector3::new(values[3], values[4], values[5]),
