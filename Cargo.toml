@@ -17,15 +17,14 @@ serde_json="*"
 serde_derive="*"
 futures="*"
 derive_builder="*"
-simplelog="*"
-log="*"
 raymond-core={path="./raymond-core"}
 
 [workspace]
 members=[
 	"cli",
 	"raymond-core",
+	"visualisations"
 ]
 exclude=[
-	"editor\\frontend"
+	"editor\\frontend",
 ]

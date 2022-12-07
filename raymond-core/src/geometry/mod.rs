@@ -49,10 +49,10 @@ impl Ray {
 		let r1 = rand::random::<f32>();
 		let r2 = rand::random::<f32>();
 	
-		let theta = (r1.sqrt()).acos() * 2.0 - 1.0;
+		let theta = (2.0 * r1 - 1.0).acos() - (std::f32::consts::PI / 2.0);
 		let phi = 2.0 * PI * r2;
 	
-		let cartesian = Vector3::new(theta.sin() * phi.cos(), theta.cos(), theta.sin() * phi.sin());
+		let cartesian = Vector3::new(theta.cos() * phi.cos(), theta.cos() * phi.sin(), theta.sin());
 		
 		Ray {
 			origin,
