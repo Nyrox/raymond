@@ -1,4 +1,9 @@
-use crate::{Material, Vector3, geometry::{AccGrid, Mesh, Plane, Sphere}, scene, scene::Scene};
+use crate::{
+	geometry::{AccGrid, Mesh, Plane, Sphere},
+	scene,
+	scene::Scene,
+	Material, Vector3,
+};
 
 use std::{
 	fs::File,
@@ -61,7 +66,7 @@ impl Project {
 						let mut mesh = Mesh::load_ply(&std::fs::read_to_string(m).unwrap());
 						mesh.bake_transform(t);
 						scene::Geometry::Grid(Arc::new(AccGrid::build_from_mesh(mesh)))
-					},
+					}
 				},
 				material: obj.material,
 			});

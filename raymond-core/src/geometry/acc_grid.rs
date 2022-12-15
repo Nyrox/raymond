@@ -64,7 +64,6 @@ impl AccGrid {
 				assert!(cell_min[i] <= cell_max[i]);
 			}
 
-
 			for z in cell_min.z..=cell_max.z {
 				for y in cell_min.y..=cell_max.y {
 					for x in cell_min.x..=cell_max.x {

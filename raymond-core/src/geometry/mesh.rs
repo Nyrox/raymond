@@ -1,4 +1,3 @@
-use std::{fs, path::PathBuf};
 
 use crate::{
 	geometry::{Hit, Intersect, Ray, SurfaceProperties, Triangle, Vertex, AABB},
@@ -87,7 +86,7 @@ impl Mesh {
 		}
 
 		// Parse faces
-		'faces: while let Some(line) = lines.next() {
+		while let Some(line) = lines.next() {
 			let tokens = line.split_whitespace();
 			let values = tokens.map(|t| t.parse::<u32>().unwrap()).collect::<Vec<u32>>();
 

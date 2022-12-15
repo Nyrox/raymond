@@ -11,6 +11,7 @@ pub mod project;
 pub mod scene;
 pub mod tile;
 pub mod trace;
+pub mod brdf;
 
 pub use tile::Tile;
 

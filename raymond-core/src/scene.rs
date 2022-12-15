@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use crate::{
-	geometry::{AccGrid, Hit, Intersect, Mesh, Plane, Ray, Sphere, SurfaceProperties, Triangle},
+	geometry::{AccGrid, Hit, Intersect, Mesh, Plane, Ray, Sphere, SurfaceProperties},
 	math::prelude::*,
 	Material,
 };

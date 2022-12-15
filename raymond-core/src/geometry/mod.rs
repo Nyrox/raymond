@@ -48,18 +48,32 @@ impl Ray {
 	pub fn random_direction(origin: Vector3) -> Ray {
 		let r1 = rand::random::<f32>();
 		let r2 = rand::random::<f32>();
-	
+
 		let theta = (2.0 * r1 - 1.0).acos() - (std::f32::consts::PI / 2.0);
 		let phi = 2.0 * PI * r2;
-	
+
 		let cartesian = Vector3::new(theta.cos() * phi.cos(), theta.cos() * phi.sin(), theta.sin());
-		
+
 		Ray {
 			origin,
 			direction: cartesian,
 		}
 	}
+
+	pub fn random_direction_over_hemisphere() -> (Vector3, f32) {
+		let r1 = rand::random::<f32>();
+		let r2 = rand::random::<f32>();
+	
+		let theta = (r1.sqrt()).acos();
+		let phi = 2.0 * PI * r2;
+	
+		let pdf = r1.sqrt();
+		let cartesian = Vector3::new(theta.sin() * phi.cos(), theta.cos(), theta.sin() * phi.sin());
+		return (cartesian, pdf);
+	}
 }
+
+
 
 pub trait Intersect {
 	fn intersects(&self, ray: Ray) -> Option<Hit>;

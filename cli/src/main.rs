@@ -39,7 +39,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 				.backbuffer_width(WIDTH)
 				.backbuffer_height(HEIGHT)
 				.fov_vert(55.0)
-				.transform(Transform { position: Vector3::new(0.0, 0.5, -1.0) })
+				.transform(Transform {
+					position: Vector3::new(0.0, 0.5, -1.0),
+				})
 				.focal_length(2.5)
 				.aperture_radius(0.0)
 				.build()
@@ -47,9 +49,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 			let settings = SettingsBuilder::default()
 				.camera_settings(camera)
-				.sample_count(250)
+				.sample_count(2000)
 				.tile_size((512, 512))
-				.bounce_limit(5)
+				.bounce_limit(6)
 				.samples_per_iteration(5)
 				.build()
 				.unwrap();
