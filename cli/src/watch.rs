@@ -1,4 +1,5 @@
 use minifb::{Key, Window, WindowOptions};
+use raymond_core::prelude::TFloat;
 
 use std::{
 	sync::mpsc::{self, Receiver, Sender},
@@ -36,9 +37,9 @@ impl WatcherHandle {
 					let exposure = 1.0;
 					let gamma = 2.2;
 
-					let p = p / (tile.sample_count as f32);
+					let p = p / (tile.sample_count as TFloat);
 
-					let tone_mapped = 1.0 - f32::exp(p * -1.0 * exposure);
+					let tone_mapped = 1.0 - TFloat::exp(p * -1.0 * exposure);
 					let tone_mapped = tone_mapped.powf(1.0 / gamma);
 
 					(tone_mapped.min(1.0).max(0.0) * 255.0) as u32

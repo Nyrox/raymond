@@ -49,9 +49,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 			let settings = SettingsBuilder::default()
 				.camera_settings(camera)
-				.sample_count(2000)
+				.sample_count(100)
 				.tile_size((512, 512))
-				.bounce_limit(6)
+				.bounce_limit(5)
 				.samples_per_iteration(5)
 				.build()
 				.unwrap();

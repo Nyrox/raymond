@@ -11,13 +11,13 @@ pub struct SurfaceProperties {
 
 #[derive(Clone, Copy, Debug)]
 pub struct Hit {
-	pub distance: f32,
+	pub distance: TFloat,
 	pub ray: Ray,
 	pub subobject_index: usize,
 }
 
 impl Hit {
-	pub fn new(ray: Ray, distance: f32) -> Hit {
+	pub fn new(ray: Ray, distance: TFloat) -> Hit {
 		Hit {
 			ray,
 			distance,
@@ -25,7 +25,7 @@ impl Hit {
 		}
 	}
 
-	pub fn with_child(ray: Ray, distance: f32, subobject_index: usize) -> Hit {
+	pub fn with_child(ray: Ray, distance: TFloat, subobject_index: usize) -> Hit {
 		Hit {
 			ray,
 			distance,
@@ -46,10 +46,10 @@ impl Ray {
 	}
 
 	pub fn random_direction(origin: Vector3) -> Ray {
-		let r1 = rand::random::<f32>();
-		let r2 = rand::random::<f32>();
+		let r1 = rand::random::<TFloat>();
+		let r2 = rand::random::<TFloat>();
 
-		let theta = (2.0 * r1 - 1.0).acos() - (std::f32::consts::PI / 2.0);
+		let theta = (2.0 * r1 - 1.0).acos() - (PI / 2.0);
 		let phi = 2.0 * PI * r2;
 
 		let cartesian = Vector3::new(theta.cos() * phi.cos(), theta.cos() * phi.sin(), theta.sin());
@@ -60,14 +60,14 @@ impl Ray {
 		}
 	}
 
-	pub fn random_direction_over_hemisphere() -> (Vector3, f32) {
-		let r1 = rand::random::<f32>();
-		let r2 = rand::random::<f32>();
+	pub fn random_direction_over_hemisphere() -> (Vector3, TFloat) {
+		let r1 = rand::random::<TFloat>();
+		let r2 = rand::random::<TFloat>();
 	
 		let theta = (r1.sqrt()).acos();
 		let phi = 2.0 * PI * r2;
 	
-		let pdf = r1.sqrt();
+		let pdf = theta.cos() * (1.0 / PI);
 		let cartesian = Vector3::new(theta.sin() * phi.cos(), theta.cos(), theta.sin() * phi.sin());
 		return (cartesian, pdf);
 	}

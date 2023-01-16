@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct Sphere {
 	pub origin: Vector3,
-	pub radius: f32,
+	pub radius: TFloat,
 }
 
 impl Intersect for Sphere {

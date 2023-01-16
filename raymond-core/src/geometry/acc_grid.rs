@@ -3,7 +3,7 @@ use crate::{
 	math::prelude::*,
 };
 
-const GRID_DENSITY_BIAS: f32 = 3.0;
+const GRID_DENSITY_BIAS: TFloat = 3.0;
 
 fn estimate_grid_resolution(bounds: &AABB, triangle_count: usize) -> cgmath::Vector3<usize> {
 	if triangle_count < 10 {
@@ -12,7 +12,7 @@ fn estimate_grid_resolution(bounds: &AABB, triangle_count: usize) -> cgmath::Vec
 	let size = bounds.max - bounds.min;
 	let volume = (size.x * size.y * size.z).abs();
 
-	let triangle_density = ((GRID_DENSITY_BIAS * triangle_count as f32) / volume).powf(1.0 / 3.0);
+	let triangle_density = ((GRID_DENSITY_BIAS * triangle_count as TFloat) / volume).powf(1.0 / 3.0);
 
 	return cgmath::Vector3::new(
 		(size.x.abs() * triangle_density).max(1.0) as usize,
@@ -41,7 +41,7 @@ impl AccGrid {
 	pub fn build_from_mesh(mesh: Mesh) -> AccGrid {
 		let grid_res = estimate_grid_resolution(&mesh.bounding_box, mesh.triangles.len());
 
-		let cell_size = (mesh.bounding_box.max - mesh.bounding_box.min).div_element_wise(grid_res.cast::<f32>().unwrap());
+		let cell_size = (mesh.bounding_box.max - mesh.bounding_box.min).div_element_wise(grid_res.cast::<TFloat>().unwrap());
 		let mut naive_cells = vec![NaiveCell(Vec::new()); grid_res.x * grid_res.y * grid_res.z];
 		let mut mapping_table: Vec<usize> = Vec::new();
 
@@ -131,11 +131,11 @@ impl AccGrid {
 		} / ray.direction.z;
 
 		let mut t_max_x =
-			(((current_cell.x + if ray.direction.x < 0.0 { 0 } else { 1 }) as f32 * self.cell_size.x) - start.x) / ray.direction.x;
+			(((current_cell.x + if ray.direction.x < 0.0 { 0 } else { 1 }) as TFloat * self.cell_size.x) - start.x) / ray.direction.x;
 		let mut t_max_y =
-			(((current_cell.y + if ray.direction.y < 0.0 { 0 } else { 1 }) as f32 * self.cell_size.y) - start.y) / ray.direction.y;
+			(((current_cell.y + if ray.direction.y < 0.0 { 0 } else { 1 }) as TFloat * self.cell_size.y) - start.y) / ray.direction.y;
 		let mut t_max_z =
-			(((current_cell.z + if ray.direction.z < 0.0 { 0 } else { 1 }) as f32 * self.cell_size.z) - start.z) / ray.direction.z;
+			(((current_cell.z + if ray.direction.z < 0.0 { 0 } else { 1 }) as TFloat * self.cell_size.z) - start.z) / ray.direction.z;
 
 		loop {
 			let (x, y, z) = (current_cell.x as usize, current_cell.y as usize, current_cell.z as usize);

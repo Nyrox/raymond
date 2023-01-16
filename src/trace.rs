@@ -1,5 +1,4 @@
 use std::{
-	f32,
 	sync::{
 		atomic::{AtomicUsize, Ordering},
 		mpsc::{self},
@@ -23,10 +22,10 @@ use raymond_core::{geometry::*, prelude::*, scene::Scene, tile::Tile};
 pub struct CameraSettings {
 	pub backbuffer_width: usize,
 	pub backbuffer_height: usize,
-	pub fov_vert: f32,
+	pub fov_vert: TFloat,
 	pub transform: Transform,
-	pub focal_length: f32,
-	pub aperture_radius: f32,
+	pub focal_length: TFloat,
+	pub aperture_radius: TFloat,
 }
 
 #[derive(Builder, Clone, Debug)]
@@ -86,7 +85,7 @@ impl TaskHandle {
 						Ok(Message::TileFinished(tile)) => {
 							for y in 0..tile.height {
 								for x in 0..tile.width {
-									let s = tile.data[x + y * tile.width] / tile.sample_count as f32;
+									let s = tile.data[x + y * tile.width] / tile.sample_count as TFloat;
 
 									out[x + tile.left + (y + tile.top) * self.settings.camera_settings.backbuffer_width] = s;
 								}
@@ -231,14 +230,14 @@ pub fn render_tiled(scene: Scene, settings: Settings) -> TaskHandle {
 
 
 fn generate_primary_ray(x: usize, y: usize, camera: &CameraSettings) -> Ray {
-	let width = camera.backbuffer_width as f32;
-	let height = camera.backbuffer_height as f32;
+	let width = camera.backbuffer_width as TFloat;
+	let height = camera.backbuffer_height as TFloat;
 	let aspect = width / height;
-	let x = x as f32 + (rand::random::<f32>() - 0.5);
-	let y = y as f32 + (rand::random::<f32>() - 0.5);
+	let x = x as TFloat + (rand::random::<TFloat>() - 0.5);
+	let y = y as TFloat + (rand::random::<TFloat>() - 0.5);
 
-	let px = (2.0 * ((x + 0.5) / width) - 1.0) * f32::tan(camera.fov_vert / 2.0 * PI / 180.0) * aspect;
-	let py = (1.0 - 2.0 * ((y + 0.5) / height)) * f32::tan(camera.fov_vert / 2.0 * PI / 180.0);
+	let px = (2.0 * ((x + 0.5) / width) - 1.0) * TFloat::tan(camera.fov_vert / 2.0 * PI / 180.0) * aspect;
+	let py = (1.0 - 2.0 * ((y + 0.5) / height)) * TFloat::tan(camera.fov_vert / 2.0 * PI / 180.0);
 
 	Ray::new(camera.transform.position, Vector3::new(px, py, 1.0).normalize())
 }
@@ -248,8 +247,8 @@ fn generate_primary_ray_with_dof(x: usize, y: usize, camera: &CameraSettings) ->
 
 	// chose random point on the aperture, through rejection sampling
 	let start = loop {
-		let r1 = rand::random::<f32>() * 2.0 - 1.0;
-		let r2 = rand::random::<f32>() * 2.0 - 1.0;
+		let r1 = rand::random::<TFloat>() * 2.0 - 1.0;
+		let r2 = rand::random::<TFloat>() * 2.0 - 1.0;
 		let ax = camera.transform.position.x + r1 * camera.aperture_radius;
 		let ay = camera.transform.position.y + r2 * camera.aperture_radius;
 		let _start = Vector3::new(ax, ay, camera.transform.position.z);

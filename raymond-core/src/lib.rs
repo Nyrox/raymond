@@ -1,9 +1,10 @@
 /* Core Type Definitions */
 
+use prelude::TFloat;
 use serde::{Deserialize, Serialize};
 
-pub type Vector3 = cgmath::Vector3<f32>;
-pub type Vector2 = cgmath::Vector2<f32>;
+pub type Vector3 = cgmath::Vector3<TFloat>;
+pub type Vector2 = cgmath::Vector2<TFloat>;
 
 pub mod geometry;
 pub mod math;
@@ -25,7 +26,7 @@ pub mod prelude {
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum Material {
-	Diffuse(Vector3, f32),
-	Metal(Vector3, f32),
-	Emission(Vector3, Vector3, f32, f32),
+	Diffuse(Vector3, TFloat),
+	Metal(Vector3, TFloat),
+	Emission(Vector3, Vector3, TFloat, TFloat),
 }

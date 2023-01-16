@@ -6,7 +6,7 @@ use raymond_core::{geometry::Ray, project::Project, Vector3};
 fn criterion_benchmark(c: &mut Criterion) {
 	std::env::set_current_dir(Path::new(".."));
 
-	let project = Project::parse(include_str!("../../assets/scenes/dragon_room/scene.json")).unwrap();
+	let project = Project::parse(include_str!("../../assets/scenes/dragon_room_lit/scene.json")).unwrap();
 	let scene = project.build_scene();
 
 	c.bench_function("Random Rays into Dragon Room Scene", |b| {

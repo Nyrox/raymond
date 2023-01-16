@@ -10,5 +10,5 @@ fn main() {
 	// rays::random_directions().unwrap();
 	// rays::random_directions_over_hemisphere().unwrap();
 	rays::importance_sample_ggx_towards_camera().unwrap();
-
+	rays::visualise_pdf_over_hemisphere().unwrap();
 }
